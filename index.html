@@ -8,14 +8,14 @@
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#001126;color:#fff;font-family:system-ui,Arial;touch-action:none}
 #game{position:relative;width:100vw;height:100dvh;overflow:hidden;background:radial-gradient(ellipse at center,#071b31 0,#001126 68%)}
 #hud{position:absolute;top:8px;left:8px;right:8px;z-index:5;display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:12px}
-.panel{background:#06182bdc;border:1px solid #537084;border-radius:9px;padding:6px 9px;box-shadow:0 0 10px #001}
-#bossbar{position:absolute;top:47px;left:18%;width:64%;height:12px;border:1px solid #d7e5f1;background:#06101c;z-index:4}
+.panel{background:#06182ddc;border:1px solid #537084;border-radius:7px;padding:4px 6px;box-shadow:0 0 8px #001}
+#bossbar{position:absolute;top:39px;left:27%;width:46%;height:7px;border:1px solid #d7e5f1;background:#06101c;z-index:4}
 #bossfill{height:100%;width:100%;background:#e53c69;transition:width .15s}
 #arena{position:absolute;inset:0;overflow:hidden}
 .enemy{position:absolute;width:54px;height:54px;object-fit:cover;border:1px solid #7a9fb6;box-shadow:0 0 12px #6daaff66;border-radius:3px;user-select:none}
 .enemy.boss{width:76px;height:76px;border:2px solid #ff6a85;box-shadow:0 0 18px #ff315d88}
 .minion{width:32px;height:32px;border-color:#a5bad0}
-#plane{position:absolute;z-index:3;width:38px;height:48px;left:50%;top:76%;transform:translate(-50%,-50%);font-size:38px;filter:drop-shadow(0 0 8px #18dfff);text-align:center;line-height:48px}
+#plane{position:absolute;z-index:3;width:30px;height:28px;left:50%;top:76%;transform:translate(-50%,-50%);font-size:0;filter:drop-shadow(0 0 5px #18dfff)} #plane:before{content:'';position:absolute;left:4px;top:0;width:22px;height:23px;border:2px solid #45eaff;border-bottom:0;border-radius:15px 15px 0 0;background:#0a8ca8} #plane:after{content:'';position:absolute;left:4px;top:10px;width:22px;height:12px;border:2px solid #45eaff;border-top:0;border-radius:0 0 4px 4px;background:#0a8ca8}
 .shot{position:absolute;width:4px;height:16px;border-radius:5px;background:#24e7ff;box-shadow:0 0 9px #24e7ff;z-index:2}
 .bullet{position:absolute;width:7px;height:13px;border-radius:4px;background:#ffb21e;box-shadow:0 0 8px #ff7a00;z-index:2}
 #stick{position:absolute;left:22px;bottom:28px;width:116px;height:116px;border-radius:50%;background:#34495bbd;border:1px solid #6e8598;z-index:8;touch-action:none}
@@ -50,13 +50,13 @@ button{border:0;border-radius:10px;background:#00c8e8;color:#001126;font-weight:
 const arena=document.getElementById('arena'),plane=document.getElementById('plane'),stick=document.getElementById('stick'),knob=document.getElementById('knob');
 const hpEl=document.getElementById('hp'),levelEl=document.getElementById('level'),nameEl=document.getElementById('enemyname'),bar=document.getElementById('bossfill'),overlay=document.getElementById('overlay');
 const bosses=[
- {name:'الولبي المتخلخل',img:'https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg',hp:12,minions:2,rate:1150},
- {name:'القزم الأسود',img:'https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg',hp:18,minions:3,rate:950},
- {name:'الملتهم الأحمق',img:'https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg',hp:25,minions:3,rate:780},
- {name:'الأبيض الشرس',img:'https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg',hp:34,minions:4,rate:650},
- {name:'المجهول المقرف الأبيض الكريه',img:'https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg',hp:48,minions:5,rate:520}
+ {name:'الولبي المتخلخل',img:'https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg',hp:12,minions:2,rate:1250,pattern:'single'},
+ {name:'القزم الأسود',img:'https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg',hp:18,minions:4,rate:1000,pattern:'spread'},
+ {name:'الملتهم الأحمق',img:'https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg',hp:25,minions:6,rate:820,pattern:'aimed'},
+ {name:'الأبيض الشرس',img:'https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg',hp:34,minions:8,rate:690,pattern:'burst'},
+ {name:'المجهول المقرف الأبيض الكريه',img:'https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg',hp:60,minions:11,rate:430,pattern:'final'}
 ];
-let W,H,px=.5,py=.76,dx=0,dy=0,playing=false,hp=100,stage=0,boss=null,enemies=[],shots=[],bullets=[],lastShot=0,lastEnemyShot=0,lastSpawn=0,lastTime=0,raf=0;
+let W,H,px=.5,py=.76,dx=0,dy=0,playing=false,hp=100,stage=0,boss=null,enemies=[],shots=[],bullets=[],lastShot=0,lastEnemyShot=0,lastTime=0,raf=0,finalMove=0;
 function size(){W=arena.clientWidth;H=arena.clientHeight;px=Math.min(1,Math.max(0,px));py=Math.min(1,Math.max(0,py))}
 window.addEventListener('resize',size);size();
 function el(tag,cls){let n=document.createElement(tag);if(cls)n.className=cls;arena.appendChild(n);return n}
@@ -67,19 +67,39 @@ function spawnEnemy(isBoss=false){
 }
 function startStage(){enemies.forEach(e=>e.node.remove());enemies=[];shots.forEach(x=>x.node.remove());shots=[];bullets.forEach(x=>x.node.remove());bullets=[];boss=spawnEnemy(true);for(let i=0;i<bosses[stage].minions;i++)spawnEnemy(false);nameEl.textContent=bosses[stage].name;levelEl.textContent=stage+1;bar.style.width='100%';}
 function shootPlayer(t){if(t-lastShot<190)return;lastShot=t;const s=el('div','shot');s.style.left=(px*W-2)+'px';s.style.top=(py*H-28)+'px';shots.push({node:s,x:px*W,y:py*H-28})}
-function shootEnemy(e){const b=el('div','bullet');b.style.left=e.x+'px';b.style.top=(e.y+24)+'px';let tx=px*W,ty=py*H,dx=tx-e.x,dy=ty-e.y,len=Math.hypot(dx,dy)||1;bullets.push({node:b,x:e.x,y:e.y+24,vx:dx/len*2.5,vy:dy/len*2.5})}
+function shootEnemy(e,angleOffset=0,speed=2.5){
+ const b=el('div','bullet');b.style.left=e.x+'px';b.style.top=(e.y+24)+'px';
+ let tx=px*W,ty=py*H,dx=tx-e.x,dy=ty-e.y,a=Math.atan2(dy,dx)+angleOffset;
+ bullets.push({node:b,x:e.x,y:e.y+24,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed})
+}
+function bossAttack(t){
+ const spec=bosses[stage],living=enemies.filter(e=>!e.isBoss);
+ if(t-lastEnemyShot<spec.rate)return;
+ lastEnemyShot=t;
+ if(stage===0){shootEnemy(boss,0,2.1)}
+ else if(stage===1){[-.24,0,.24].forEach(a=>shootEnemy(boss,a,2.3))}
+ else if(stage===2){shootEnemy(boss,0,2.7);shootEnemy(boss,-.18,2.3);shootEnemy(boss,.18,2.3)}
+ else if(stage===3){for(let i=-2;i<=2;i++)shootEnemy(boss,i*.17,2.7);living.forEach((e,i)=>{if(i%2===0)shootEnemy(e,0,2.2)})}
+ else {
+   const mode=Math.floor(t/1700)%4;
+   if(mode===0){for(let i=-3;i<=3;i++)shootEnemy(boss,i*.14,3.0)}
+   else if(mode===1){for(let i=0;i<12;i++)shootEnemy(boss,i*Math.PI/6,2.5)}
+   else if(mode===2){for(let i=-2;i<=2;i++)shootEnemy(boss,i*.10,3.3);living.forEach(e=>shootEnemy(e,0,2.8))}
+   else {for(let i=0;i<8;i++)shootEnemy(boss,i*Math.PI/4+ t*.001,2.8)}
+ }
+}
 function end(msg,title){playing=false;overlay.style.display='flex';document.getElementById('dialog').innerHTML='<h1>'+title+'</h1><p>'+msg+'</p><button id="again">العب مرة أخرى</button>';document.getElementById('again').onclick=reset}
 function reset(){hp=100;stage=0;px=.5;py=.76;hpEl.textContent=hp;overlay.style.display='none';playing=true;startStage();lastTime=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
 function loop(t){
  if(!playing)return;let dt=Math.min(32,t-(lastTime||t));lastTime=t;
- px=Math.max(.06,Math.min(.94,px+dx*dt*.00065));py=Math.max(.12,Math.min(.91,py+dy*dt*.00065));
+ px=Math.max(.06,Math.min(.94,px+dx*dt*.00048));py=Math.max(.12,Math.min(.91,py+dy*dt*.00048));
  plane.style.left=(px*W)+'px';plane.style.top=(py*H)+'px';shootPlayer(t);
  enemies.forEach(e=>{
-  if(e.isBoss){e.x=W*.5+Math.sin(t*.001)*W*.27;e.y=H*.15+Math.sin(t*.0017)*12}
+  if(e.isBoss){e.x=W*.5+Math.sin(t*(stage===4?.0018:.001))*W*(stage===4?.34:.27);e.y=H*.15+Math.sin(t*(stage===4?.003:.0017))* (stage===4?24:12)}
   else {e.x+=Math.sin(t*.0015+e.phase)*.7;e.y+=Math.sin(t*.001+e.phase)*.25}
   e.node.style.left=(e.x-(e.isBoss?38:16))+'px';e.node.style.top=(e.y-(e.isBoss?38:16))+'px';
  });
- if(t-lastEnemyShot>bosses[stage].rate){enemies.filter(e=>e.isBoss||stage>1).forEach(e=>shootEnemy(e));lastEnemyShot=t}
+ bossAttack(t)
  shots.forEach(s=>{s.y-=7;s.node.style.top=s.y+'px';for(let i=enemies.length-1;i>=0;i--){let e=enemies[i];if(Math.abs(s.x-e.x)<(e.isBoss?39:20)&&Math.abs(s.y-e.y)<(e.isBoss?40:23)){e.hp--;s.y=-100;if(e.hp<=0){e.node.remove();enemies.splice(i,1);if(e.isBoss){stage++;if(stage>=bosses.length){end('لقد هزمت جميع الوحوش وأنقذت الطائرة!','انتصار!');return}else{startStage();return}}}break}}});
  shots=shots.filter(s=>{if(s.y<-25){s.node.remove();return false}return true});
  bullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;b.node.style.left=b.x+'px';b.node.style.top=b.y+'px';if(Math.hypot(b.x-px*W,b.y-py*H)<23){hp-=1;b.y=H+99;hpEl.textContent=hp}});
