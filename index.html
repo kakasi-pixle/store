@@ -184,7 +184,7 @@ function spawn(i){
   cube.classList.add("spawn");
   setTimeout(()=>cube.classList.remove("spawn"), 620);
   phase = "fight";
-  hint.textContent = "اضغط على المكعب للهجوم!";
+  hint.textContent = "اضغط على العبد للهجوم!";
 }
 
 /* ====== الدم + رقم الضربة ====== */
@@ -240,7 +240,7 @@ function kill(){
   msg.textContent = "💀 لقد قتلت الوحش: " + monsters[idx].name;
   hint.textContent = "اضغط على المكعب أو الزر للوحش التالي";
   nextBtn.hidden = false;
-  nextBtn.textContent = "الوحش التالي 👹";
+  nextBtn.textContent = "العبد التالي 👹";
 }
 
 /* ====== الانتقال للوحش التالي ====== */
@@ -249,7 +249,7 @@ function next(){
   phase = "done";
   cube.classList.remove("dead");
   cube.classList.add("idle");
-  msg.textContent = "🏆 قتلت كل الوحوش! انتهت اللعبة";
+  msg.textContent = "🏆 قتلت كل العبيد! انتهت اللعبة";
   msg.classList.add("win");
   hint.textContent = "لا يوجد وحوش أخر";
   nextBtn.hidden = true;
