@@ -42,7 +42,7 @@ button{border:0;border-radius:10px;background:#00c8e8;color:#001126;font-weight:
  <button id="sound" aria-label="الصوت">♫</button>
  <div id="bossintro"></div>
  <div id="arena">
-  <div id="plane"></div><div id="allyplane" style="display:none;position:absolute;z-index:3;width:28px;height:26px;color:#ffb44d;font-size:25px;text-align:center;filter:drop-shadow(0 0 6px #ff9c32)">^</div>
+  <div id="plane"></div><img id="allyplane" alt="الملتهم الأحمق - مساعد" style="display:none;position:absolute;z-index:3;width:38px;height:38px;object-fit:cover;border:2px solid #ffb44d;border-radius:4px;box-shadow:0 0 10px #ff9c32">
  </div>
  <div id="stick"><div id="knob"></div></div>
  <div id="hint">حرّك عصا التحكم لتفادي الطلقات — إطلاق النار تلقائي</div>
@@ -90,10 +90,10 @@ function announceBoss(name){
 function startStage(){
  enemies.forEach(e=>e.node.remove());enemies=[];shots.forEach(x=>x.node.remove());shots=[];bullets.forEach(x=>x.node.remove());bullets=[];
  allyShots.forEach(x=>x.node.remove());allyShots=[];ally=null;planeBoost=stage===4;
- plane.style.transform=planeBoost?'translate(-50%,-50%) scale(1.55)':'translate(-50%,-50%) scale(1)';
- allyPlane.style.display=planeBoost?'block':'none';
+ plane.style.transform='translate(-50%,-50%) scale(1)';
+ allyPlane.style.display='block';allyPlane.src=bosses[2].img;
  boss=spawnEnemy(true);for(let i=0;i<bosses[stage].minions;i++)spawnEnemy(false);
- if(planeBoost){ally={x:W*.32,y:H*.76};intro.textContent='الملتهم الأحمق انضم إليك!';}
+ ally={x:W*.30,y:H*.73};intro.textContent='الملتهم الأحمق انضم إليك!';
  nameEl.textContent=bosses[stage].name;levelEl.textContent=stage+1;bar.style.width='100%';lastEnemyShot=performance.now()+450;announceBoss(bosses[stage].name);
 }
 function shootPlayer(t){if(t-lastShot<190)return;lastShot=t;const s=el('div','shot');s.style.left=(px*W-2)+'px';s.style.top=(py*H-28)+'px';shots.push({node:s,x:px*W,y:py*H-28});sfxShoot()}
@@ -123,10 +123,10 @@ function end(msg,title){playing=false;overlay.style.display='flex';document.getE
 function reset(){hp=100;stage=0;px=.5;py=.76;hpEl.textContent=hp;overlay.style.display='none';playing=true;startStage();lastTime=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
 function loop(t){
  if(!playing)return;let dt=Math.min(32,t-(lastTime||t));lastTime=t;
- if(stage===4&&ally){
+ if(ally){
   ally.x=W*.30+Math.sin(t*.0015)*W*.09;ally.y=H*.73+Math.sin(t*.002)*14;
   allyPlane.style.left=ally.x+'px';allyPlane.style.top=ally.y+'px';allyPlane.style.transform='translate(-50%,-50%)';
-  if(t-lastAllyShot>280){lastAllyShot=t;const s=el('div','shot');s.style.background='#ffb44d';s.style.boxShadow='0 0 10px #ff9c32';s.style.left=ally.x+'px';s.style.top=(ally.y-24)+'px';allyShots.push({node:s,x:ally.x,y:ally.y-24});sfxAlly()}
+  if(t-lastAllyShot>Math.max(150,360-stage*45)){lastAllyShot=t;const s=el('div','shot');s.style.background='#ffb44d';s.style.boxShadow='0 0 10px #ff9c32';s.style.left=ally.x+'px';s.style.top=(ally.y-24)+'px';allyShots.push({node:s,x:ally.x,y:ally.y-24});sfxAlly()}
  }
  px=Math.max(.06,Math.min(.94,px+dx*dt*.00048));py=Math.max(.12,Math.min(.91,py+dy*dt*.00048));
  plane.style.left=(px*W)+'px';plane.style.top=(py*H)+'px';shootPlayer(t);
