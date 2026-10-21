@@ -21,6 +21,8 @@
 #stick{position:absolute;left:22px;bottom:28px;width:116px;height:116px;border-radius:50%;background:#34495bbd;border:1px solid #6e8598;z-index:8;touch-action:none}
 #knob{position:absolute;width:48px;height:48px;left:33px;top:33px;border-radius:50%;background:#f5fbff;border:3px solid #9fb5c8;box-shadow:0 2px 12px #0008}
 #hint{position:absolute;bottom:12px;right:10px;max-width:54%;font-size:11px;color:#a9c2d5;text-align:right}
+#bossintro{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:9;background:#071b30eF;border:1px solid #ff6a85;border-radius:10px;padding:9px 14px;max-width:90%;text-align:center;font-weight:800;font-size:15px;white-space:nowrap;box-shadow:0 0 18px #ff315d55;opacity:0;pointer-events:none;transition:opacity .25s}
+#bossintro.show{opacity:1}
 #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#001126dd;z-index:20;text-align:center;padding:25px}
 #dialog{max-width:330px;background:#071b30;border:1px solid #51728c;border-radius:16px;padding:22px;box-shadow:0 0 35px #00bde955}
 #dialog h1{font-size:24px;margin:0 0 8px}#dialog p{line-height:1.7;color:#c4d7e5}
@@ -38,8 +40,9 @@ button{border:0;border-radius:10px;background:#00c8e8;color:#001126;font-weight:
  </div>
  <div id="bossbar"><div id="bossfill"></div></div>
  <button id="sound" aria-label="الصوت">♫</button>
+ <div id="bossintro"></div>
  <div id="arena">
-  <div id="plane">✈</div>
+  <div id="plane"></div>
  </div>
  <div id="stick"><div id="knob"></div></div>
  <div id="hint">حرّك عصا التحكم لتفادي الطلقات — إطلاق النار تلقائي</div>
@@ -48,15 +51,15 @@ button{border:0;border-radius:10px;background:#00c8e8;color:#001126;font-weight:
 <script>
 (()=>{
 const arena=document.getElementById('arena'),plane=document.getElementById('plane'),stick=document.getElementById('stick'),knob=document.getElementById('knob');
-const hpEl=document.getElementById('hp'),levelEl=document.getElementById('level'),nameEl=document.getElementById('enemyname'),bar=document.getElementById('bossfill'),overlay=document.getElementById('overlay');
+const hpEl=document.getElementById('hp'),levelEl=document.getElementById('level'),nameEl=document.getElementById('enemyname'),bar=document.getElementById('bossfill'),overlay=document.getElementById('overlay'),intro=document.getElementById('bossintro');
 const bosses=[
- {name:'الولبي المتخلخل',img:'https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg',hp:12,minions:2,rate:1250,pattern:'single'},
- {name:'القزم الأسود',img:'https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg',hp:18,minions:4,rate:1000,pattern:'spread'},
- {name:'الملتهم الأحمق',img:'https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg',hp:25,minions:6,rate:820,pattern:'aimed'},
- {name:'الأبيض الشرس',img:'https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg',hp:34,minions:8,rate:690,pattern:'burst'},
- {name:'المجهول المقرف الأبيض الكريه',img:'https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg',hp:60,minions:11,rate:430,pattern:'final'}
+ {name:'الولبي المتخلخل',img:'https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg',hp:18,minions:3,rate:1000,pattern:'single'},
+ {name:'القزم الأسود',img:'https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg',hp:26,minions:5,rate:850,pattern:'spread'},
+ {name:'الملتهم الأحمق',img:'https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg',hp:34,minions:7,rate:700,pattern:'aimed'},
+ {name:'الأبيض الشرس',img:'https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg',hp:44,minions:9,rate:590,pattern:'burst'},
+ {name:'المجهول المقرف الأبيض الكريه',img:'https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg',hp:68,minions:12,rate:380,pattern:'final'}
 ];
-let W,H,px=.5,py=.76,dx=0,dy=0,playing=false,hp=100,stage=0,boss=null,enemies=[],shots=[],bullets=[],lastShot=0,lastEnemyShot=0,lastTime=0,raf=0,finalMove=0;
+let W,H,px=.5,py=.76,dx=0,dy=0,playing=false,hp=100,stage=0,boss=null,enemies=[],shots=[],bullets=[],lastShot=0,lastEnemyShot=0,lastTime=0,raf=0,soundOn=true;
 function size(){W=arena.clientWidth;H=arena.clientHeight;px=Math.min(1,Math.max(0,px));py=Math.min(1,Math.max(0,py))}
 window.addEventListener('resize',size);size();
 function el(tag,cls){let n=document.createElement(tag);if(cls)n.className=cls;arena.appendChild(n);return n}
@@ -65,7 +68,14 @@ function spawnEnemy(isBoss=false){
  const e={node,x:isBoss?W*.5:Math.random()*(W-40)+20,y:isBoss?H*.17:Math.random()*H*.35+H*.08,isBoss,hp:isBoss?spec.hp:2,max:isBoss?spec.hp:2,phase:Math.random()*7};
  enemies.push(e);return e
 }
-function startStage(){enemies.forEach(e=>e.node.remove());enemies=[];shots.forEach(x=>x.node.remove());shots=[];bullets.forEach(x=>x.node.remove());bullets=[];boss=spawnEnemy(true);for(let i=0;i<bosses[stage].minions;i++)spawnEnemy(false);nameEl.textContent=bosses[stage].name;levelEl.textContent=stage+1;bar.style.width='100%';}
+function announceBoss(name){
+ intro.textContent='⚠ البوص: '+name+' ⚠';intro.classList.add('show');
+ if(soundOn&&'speechSynthesis' in window){
+  try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance('البوص الجديد: '+name);u.lang='ar-EG';u.rate=.88;u.pitch=.82;u.volume=1;speechSynthesis.speak(u)}catch(e){}
+ }
+ setTimeout(()=>intro.classList.remove('show'),2300);
+}
+function startStage(){enemies.forEach(e=>e.node.remove());enemies=[];shots.forEach(x=>x.node.remove());shots=[];bullets.forEach(x=>x.node.remove());bullets=[];boss=spawnEnemy(true);for(let i=0;i<bosses[stage].minions;i++)spawnEnemy(false);nameEl.textContent=bosses[stage].name;levelEl.textContent=stage+1;bar.style.width='100%';lastEnemyShot=performance.now()+450;announceBoss(bosses[stage].name);}
 function shootPlayer(t){if(t-lastShot<190)return;lastShot=t;const s=el('div','shot');s.style.left=(px*W-2)+'px';s.style.top=(py*H-28)+'px';shots.push({node:s,x:px*W,y:py*H-28})}
 function shootEnemy(e,angleOffset=0,speed=2.5){
  const b=el('div','bullet');b.style.left=e.x+'px';b.style.top=(e.y+24)+'px';
@@ -74,6 +84,7 @@ function shootEnemy(e,angleOffset=0,speed=2.5){
 }
 function bossAttack(t){
  const spec=bosses[stage],living=enemies.filter(e=>!e.isBoss);
+ living.forEach((e,i)=>{if(t-(e.lastShot||0)>spec.rate*(stage<2?2.0:1.45)+i*75){shootEnemy(e,0,1.8+stage*.18);e.lastShot=t}});
  if(t-lastEnemyShot<spec.rate)return;
  lastEnemyShot=t;
  if(stage===0){shootEnemy(boss,0,2.1)}
@@ -114,7 +125,7 @@ function moveStick(e){if(!active)return;let x=e.clientX-originX,y=e.clientY-orig
 function pointerUp(){active=false;dx=dy=0;knob.style.left='33px';knob.style.top='33px'}
 stick.addEventListener('pointerdown',pointerDown);stick.addEventListener('pointermove',moveStick);stick.addEventListener('pointerup',pointerUp);stick.addEventListener('pointercancel',pointerUp);
 document.getElementById('start').onclick=reset;
-document.getElementById('sound').onclick=()=>{document.getElementById('sound').textContent=document.getElementById('sound').textContent==='♫'?'♪':'♫'};
+document.getElementById('sound').onclick=()=>{soundOn=!soundOn;document.getElementById('sound').textContent=soundOn?'♫':'♪';if(!soundOn&&'speechSynthesis' in window)speechSynthesis.cancel()};
 })();
 </script>
 </div>
