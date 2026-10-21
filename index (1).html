@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#050a12">
+<title>الولبي المتخلخل — صيد الوحوش</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#050a12;color:#eaf6ff;
+    font-family:"Segoe UI",Tahoma,system-ui,-apple-system,sans-serif;
+    touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+  #app{position:fixed;inset:0;overflow:hidden}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column}
+  .hidden{display:none!important}
+
+  /* ===== شاشة البداية ===== */
+  #intro{z-index:10;align-items:center;justify-content:center;gap:14px;padding:16px;
+    background:radial-gradient(120% 80% at 50% 0%,#123047 0%,#071320 55%,#03070d 100%);overflow:auto}
+  #intro h1{font-size:clamp(22px,7vw,34px);letter-spacing:1px;text-align:center;
+    text-shadow:0 0 18px rgba(0,255,220,.55);color:#d8fff7}
+  #intro p.sub{font-size:13px;opacity:.75;text-align:center;margin-top:-6px}
+  .cube-box{width:190px;height:190px;perspective:900px;flex:0 0 auto}
+  .cube{position:relative;width:190px;height:190px;transform-style:preserve-3d;animation:spin 14s linear infinite}
+  .cube .face{position:absolute;width:190px;height:190px;border:1px solid rgba(0,255,220,.5);
+    background:rgba(8,22,34,.9);overflow:hidden;backface-visibility:hidden}
+  .cube .face img{width:100%;height:100%;object-fit:cover;display:block}
+  .cube .f{transform:rotateY(0deg) translateZ(95px)}
+  .cube .bk{transform:rotateY(180deg) translateZ(95px)}
+  .cube .r{transform:rotateY(90deg) translateZ(95px)}
+  .cube .l{transform:rotateY(-90deg) translateZ(95px)}
+  .cube .t{transform:rotateX(90deg) translateZ(95px)}
+  .cube .bt{transform:rotateX(-90deg) translateZ(95px)}
+  @keyframes spin{from{transform:rotateX(-20deg) rotateY(0)}to{transform:rotateX(-20deg) rotateY(360deg)}}
+  .glow{position:relative}
+  .glow:after{content:"";position:absolute;left:50%;bottom:-14px;width:150px;height:26px;transform:translateX(-50%);
+    background:radial-gradient(50% 50% at 50% 50%,rgba(0,255,210,.55),transparent 70%);filter:blur(4px)}
+  .big-btn{margin-top:6px;padding:15px 46px;border:0;border-radius:40px;font-size:20px;font-weight:700;
+    color:#02121a;background:linear-gradient(180deg,#5ef2c8,#13c8a0);box-shadow:0 0 26px rgba(0,255,200,.45);
+    font-family:inherit;cursor:pointer;animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  .roster{display:flex;gap:8px;overflow-x:auto;width:100%;padding:4px 6px 10px;-webkit-overflow-scrolling:touch}
+  .roster .m{flex:0 0 auto;width:72px;text-align:center;font-size:10px;opacity:.9}
+  .roster .m img{width:58px;height:58px;object-fit:cover;border-radius:50%;border:2px solid rgba(0,255,220,.5);
+    background:#0b1a26;display:block;margin:0 auto 4px}
+  .roster .m b{display:block;font-weight:600;line-height:1.2}
+
+  /* ===== شاشة اللعبة ===== */
+  #game{z-index:5}
+  #topbar{position:relative;height:15vh;min-height:88px;max-height:140px;flex:0 0 auto;
+    border-bottom:1px solid rgba(0,255,220,.25);background:#04090f}
+  #mini{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .mini-tag{position:absolute;top:4px;right:8px;font-size:11px;padding:2px 8px;border-radius:20px;
+    background:rgba(0,0,0,.5);border:1px solid rgba(0,255,220,.4);color:#7ff5d8;pointer-events:none}
+  #muteBtn{position:absolute;top:4px;left:8px;z-index:6;width:34px;height:34px;border-radius:50%;
+    border:1px solid rgba(0,255,220,.4);background:rgba(0,0,0,.5);color:#7ff5d8;font-size:15px;cursor:pointer}
+  #stage{position:relative;flex:1 1 auto;overflow:hidden}
+  #arena{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+  #hud{position:absolute;z-index:3;top:6px;right:8px;left:8px;display:flex;align-items:center;gap:8px;pointer-events:none}
+  .hpwrap{flex:1;height:15px;border:1px solid rgba(90,255,170,.55);border-radius:9px;background:rgba(0,0,0,.45);overflow:hidden}
+  #hpfill{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#bef264);transition:width .12s}
+  #hpnum{font-size:12px;min-width:56px;text-align:center;background:rgba(0,0,0,.45);padding:3px 6px;border-radius:8px}
+  #wavelabel{font-size:12px;padding:3px 10px;border-radius:10px;background:rgba(0,0,0,.45);
+    border:1px solid rgba(0,255,220,.35);color:#ffd166;white-space:nowrap}
+  #banner{position:absolute;z-index:3;left:50%;top:34%;transform:translateX(-50%);font-size:clamp(18px,6vw,28px);
+    font-weight:700;color:#ffe08a;text-shadow:0 0 18px rgba(255,180,0,.6);pointer-events:none;opacity:0;transition:opacity .3s;text-align:center}
+  #banner.show{opacity:1}
+
+  /* ===== الجويستيك ===== */
+  #joyBase{position:fixed;z-index:8;width:120px;height:120px;border-radius:50%;border:2px solid rgba(0,255,220,.35);
+    background:rgba(0,255,220,.07);transform:translate(-50%,-50%);pointer-events:none;display:none}
+  #joyKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#9dfff0,#12b79a);box-shadow:0 0 18px rgba(0,255,220,.6)}
+  #joyLayer{position:absolute;inset:0;z-index:2}
+
+  /* ===== شاشة النهاية ===== */
+  #over{z-index:20;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;
+    background:rgba(3,7,13,.92);backdrop-filter:blur(3px)}
+  #overTitle{font-size:clamp(26px,9vw,44px);font-weight:800;color:#ff5b5b;text-shadow:0 0 26px rgba(255,40,40,.7)}
+  #overTitle.win{color:#7dffb2;text-shadow:0 0 26px rgba(0,255,140,.6)}
+  #overSub{font-size:14px;opacity:.85;line-height:1.8}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn2{padding:12px 26px;border-radius:30px;border:1px solid rgba(0,255,220,.5);background:rgba(0,255,220,.12);
+    color:#dffff7;font-size:16px;font-family:inherit;cursor:pointer}
+  .btn2.solid{background:linear-gradient(180deg,#5ef2c8,#13c8a0);color:#02121a;border:0;font-weight:700}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- أول بوص: الصورة جوه مكعب -->
+  <div id="intro" class="screen">
+    <h1>الولبي المتخلخل</h1>
+    <p class="sub">مهمة صيد الوحوش — أنت الطيار 🛩️</p>
+    <div class="cube-box glow">
+      <div class="cube">
+        <div class="face f"><img src="https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg" alt="الولبي المتخلخل"></div>
+        <div class="face bk"></div>
+        <div class="face r"></div>
+        <div class="face l"></div>
+        <div class="face t"></div>
+        <div class="face bt"></div>
+      </div>
+    </div>
+    <button class="big-btn" id="startBtn">ابدأ المهمة</button>
+    <div class="roster" id="roster"></div>
+  </div>
+
+  <!-- شاشة اللعب -->
+  <div id="game" class="screen hidden">
+    <div id="topbar">
+      <canvas id="mini"></canvas>
+      <div class="mini-tag">نسخة الطائرة ✈️</div>
+      <button id="muteBtn">🔊</button>
+    </div>
+    <div id="stage">
+      <canvas id="arena"></canvas>
+      <div id="joyLayer"></div>
+      <div id="hud">
+        <div class="hpwrap"><div id="hpfill"></div></div>
+        <div id="hpnum">100</div>
+        <div id="wavelabel">الموجة 1</div>
+      </div>
+      <div id="banner"></div>
+    </div>
+  </div>
+
+  <!-- النهاية -->
+  <div id="over" class="screen hidden">
+    <div id="overTitle">لقد قتلت الزنجي</div>
+    <div id="overSub"></div>
+    <div class="row">
+      <button class="btn2 solid" id="againBtn">إعادة</button>
+      <button class="btn2" id="menuBtn">القائمة</button>
+    </div>
+  </div>
+
+  <div id="joyBase"><div id="joyKnob"></div></div>
+</div>
+
+<script>
+/* ============================================================
+   بيانات الوحوش والصور
+   ============================================================ */
+const IMG = {
+  wolby : 'https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg',  // 1 الولبي المتخلخل
+  dwarf : 'https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg',  // 2 القزم الاسود
+  eater : 'https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg',  // 3 الملتهم الاحمق
+  fierce: 'https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg',  // 4 الابيض الشرس
+  horror: 'https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg'   // 5 المجهول المقرف الابيض الكريه
+};
+const WAVES = [
+  {key:'wolby' , name:'الولبي المتخلخل'              , hp:8 , speed:95 , hover:290, fire:3.2, bspeed:230, spread:0   , fol:2, dmg:8 , pattern:0, r:78},
+  {key:'dwarf' , name:'القزم الاسود'                 , hp:14, speed:115, hover:275, fire:2.4, bspeed:280, spread:0.14, fol:3, dmg:9 , pattern:1, r:74},
+  {key:'eater' , name:'الملتهم الاحمق'               , hp:22, speed:135, hover:260, fire:1.8, bspeed:320, spread:0.30, fol:3, dmg:11, pattern:2, r:72},
+  {key:'fierce', name:'الابيض الشرس'                 , hp:30, speed:155, hover:245, fire:1.4, bspeed:360, spread:0.45, fol:4, dmg:12, pattern:3, r:70},
+  {key:'horror', name:'المجهول المقرف الابيض الكريه' , hp:42, speed:175, hover:230, fire:1.0, bspeed:410, spread:0.60, fol:5, dmg:14, pattern:4, r:68}
+];
+
+/* ============================================================
+   تحميل الصور
+   ============================================================ */
+const PICS = {};
+for (const k in IMG){ const im = new Image(); im.crossOrigin='anonymous'; im.src = IMG[k]; PICS[k]=im; }
+
+/* ============================================================
+   عناصر DOM
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const intro = $('#intro'), game = $('#game'), over = $('#over');
+const arena = $('#arena'), mini = $('#mini');
+const hpfill = $('#hpfill'), hpnum = $('#hpnum'), wavelabel = $('#wavelabel'), banner = $('#banner');
+const joyBase = $('#joyBase'), joyKnob = $('#joyKnob'), joyLayer = $('#joyLayer');
+const muteBtn = $('#muteBtn');
+const actx = arena.getContext('2d'), mctx = mini.getContext('2d');
+
+/* ============================================================
+   صوت بسيط
+   ============================================================ */
+let AC=null, MUTE=false;
+function ac(){ try{ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended')AC.resume(); }catch(e){AC=null;} return AC; }
+function tone(f1,f2,dur,type,vol){
+  const c=ac(); if(!c||MUTE) return;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f1,c.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(40,f2),c.currentTime+dur);
+  g.gain.setValueAtTime(vol||0.05,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dur);
+  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+dur+0.02);
+}
+function boom(dur,vol){
+  const c=ac(); if(!c||MUTE) return;
+  const n=Math.floor(c.sampleRate*dur), b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);
+  const s=c.createBufferSource(); s.buffer=b;
+  const g=c.createGain(); g.gain.value=vol||0.18;
+  s.connect(g); g.connect(c.destination); s.start();
+}
+function buzz(){ if(navigator.vibrate) try{navigator.vibrate(35);}catch(e){} }
+
+/* ============================================================
+   حالة اللعبة
+   ============================================================ */
+const ARENA_X = 170, ZMAX = 900, CAM_H = 380, D0 = 350;
+const PLAYER_Y = 95, PLAYER_R = 34;
+const G = {
+  state:'intro', wave:0, score:0, time:0, shake:0, flash:0,
+  monster:null, followers:[], bullets:[], ebullets:[], parts:[],
+  player:{x:0,z:70,hp:100,maxHp:100,cd:0,inv:0,alive:true},
+  joy:{on:false,id:null,ox:0,oy:0,x:0,y:0},
+  keys:{}
+};
+
+/* ============================================================
+   القياسات
+   ============================================================ */
+let W=0,H=0,CX=0,horizon=0,DPR=1, MW=0,MH=0;
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio||1);
+  const st = $('#stage').getBoundingClientRect();
+  W = Math.max(1,st.width); H = Math.max(1,st.height);
+  arena.width = W*DPR; arena.height = H*DPR;
+  arena.style.width = W+'px'; arena.style.height = H+'px';
+  actx.setTransform(DPR,0,0,DPR,0,0);
+  CX = W/2; horizon = H*0.16;
+
+  const tb = $('#topbar').getBoundingClientRect();
+  MW = Math.max(1,tb.width); MH = Math.max(1,tb.height);
+  mini.width = MW*DPR; mini.height = MH*DPR;
+  mini.style.width = MW+'px'; mini.style.height = MH+'px';
+  mctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=>setTimeout(resize,250));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+/* ============================================================
+   الإسقاط (كاميرا حقيقية)
+   ============================================================ */
+function proj(x,y,z){
+  const s = D0/(D0+Math.max(0,z));
+  const k = (H-horizon)*s/CAM_H;
+  return { x: CX + x*k, y: horizon + (CAM_H-y)*k, k };
+}
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+
+/* ============================================================
+   الجويستيك (سحب في أي مكان بالشاشة)
+   ============================================================ */
+function joyStart(e){
+  if(G.state!=='playing') return;
+  const t = e.touches? e.touches[0] : e;
+  G.joy.on=true; G.joy.id = (e.touches? e.touches[0].identifier : e.pointerId);
+  G.joy.ox=t.clientX; G.joy.oy=t.clientY; G.joy.x=0; G.joy.y=0;
+  joyBase.style.display='block';
+  joyBase.style.left=t.clientX+'px'; joyBase.style.top=t.clientY+'px';
+  joyKnob.style.transform='translate(0px,0px)';
+  e.preventDefault();
+}
+function joyMove(e){
+  if(!G.joy.on) return;
+  const list = e.touches? Array.from(e.touches) : [e];
+  const t = list.find(x=> (e.touches? x.identifier : x.pointerId) === G.joy.id) || list[0];
+  if(!t) return;
+  const dx = t.clientX-G.joy.ox, dy = t.clientY-G.joy.oy;
+  const R = 52, d = Math.hypot(dx,dy);
+  const kk = d>R? R/d : 1;
+  G.joy.x = (dx*kk)/R; G.joy.y = (dy*kk)/R;
+  joyKnob.style.transform = 'translate('+(dx*kk)+'px,'+(dy*kk)+'px)';
+  e.preventDefault();
+}
+function joyEnd(){
+  G.joy.on=false; G.joy.x=0; G.joy.y=0; joyBase.style.display='none';
+}
+joyLayer.addEventListener('touchstart', joyStart, {passive:false});
+joyLayer.addEventListener('touchmove', joyMove, {passive:false});
+joyLayer.addEventListener('touchend', joyEnd);
+joyLayer.addEventListener('touchcancel', joyEnd);
+joyLayer.addEventListener('mousedown', joyStart);
+window.addEventListener('mousemove', joyMove);
+window.addEventListener('mouseup', joyEnd);
+
+window.addEventListener('keydown', e=>{ G.keys[e.key.toLowerCase()]=true; if(e.key===' ') e.preventDefault(); });
+window.addEventListener('keyup',   e=>{ G.keys[e.key.toLowerCase()]=false; });
+
+/* ============================================================
+   بدء وإيقاف
+   ============================================================ */
+function startGame(){
+  G.state='playing'; G.wave=0; G.score=0; G.time=0;
+  G.bullets.length=0; G.ebullets.length=0; G.parts.length=0;
+  G.player.x=0; G.player.z=70; G.player.hp=100; G.player.cd=0; G.player.inv=0; G.player.alive=true;
+  G.shake=0; G.flash=0;
+  intro.classList.add('hidden'); over.classList.add('hidden'); game.classList.remove('hidden');
+  resize();
+  startWave(0);
+}
+function startWave(i){
+  G.wave=i; const w=WAVES[i];
+  G.monster = { x:0, y:PLAYER_Y, z:640, t:0, phase:Math.random()*6, hp:w.hp, maxhp:w.hp,
+                r:w.r, fireCd:w.fire*0.8, dashCd:5, dashT:0, hitFlash:0 };
+  G.followers.length=0;
+  for(let k=0;k<w.fol;k++){
+    G.followers.push({ang:Math.random()*6.28, rad:52+Math.random()*40, x:0, y:PLAYER_Y, z:640, hp:1, t:Math.random()*6});
+  }
+  wavelabel.textContent = 'الموجة '+(i+1)+' — '+w.name;
+  showBanner(w.name+' ظهر!');
+  tone(220,520,.18,'square',.05);
+}
+function showBanner(txt){ banner.textContent=txt; banner.classList.add('show'); clearTimeout(showBanner._t);
+  showBanner._t = setTimeout(()=>banner.classList.remove('show'), 1400); }
+
+function gameOver(win){
+  G.state = win? 'won':'dead';
+  const t=$('#overTitle'), s=$('#overSub');
+  if(win){ t.textContent='انتهت المهمة! 🏆'; t.classList.add('win');
+    s.innerHTML='قتلت كل الوحوش الخمسة 🔪<br>النقاط: '+G.score; }
+  else { t.textContent='لقد قتلت الزنجي'; t.classList.remove('win');
+    s.innerHTML='الزنجي موت... وبقي الزنوجي 😎<br>وصلت للموجة '+(G.wave+1)+' — النقاط: '+G.score; }
+  over.classList.remove('hidden');
+  tone(300,60,.5,'sawtooth',.08);
+}
+$('#startBtn').addEventListener('click', startGame);
+$('#againBtn').addEventListener('click', startGame);
+$('#menuBtn').addEventListener('click', ()=>{ over.classList.add('hidden'); game.classList.add('hidden'); intro.classList.remove('hidden'); G.state='intro'; });
+muteBtn.addEventListener('click', ()=>{ MUTE=!MUTE; muteBtn.textContent = MUTE?'🔇':'🔊'; });
+
+/* ============================================================
+   رسم الصور
+   ============================================================ */
+function drawFace(ctx, img, x, y, r, flash){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x,y,Math.max(2,r),0,6.2832); ctx.closePath();
+  ctx.save(); ctx.clip();
+  if(img && img.complete && img.naturalWidth){
+    ctx.drawImage(img, x-r, y-r, r*2, r*2);
+  } else {
+    const gr=ctx.createRadialGradient(x-r*0.3,y-r*0.35,r*0.1,x,y,r);
+    gr.addColorStop(0,'#7c8cff'); gr.addColorStop(1,'#2a0f3d');
+    ctx.fillStyle=gr; ctx.fillRect(x-r,y-r,r*2,r*2);
+  }
+  if(flash>0){ ctx.fillStyle='rgba(255,255,255,'+Math.min(.85,flash)+')'; ctx.fillRect(x-r,y-r,r*2,r*2); }
+  ctx.restore();
+  ctx.lineWidth=Math.max(1,r*0.09); ctx.strokeStyle='rgba(0,255,210,.75)'; ctx.stroke();
+  // عيون حمراء
+  ctx.fillStyle='rgba(255,60,60,.9)';
+  const ex=r*0.3, ey=-r*0.12, er=Math.max(1.2,r*0.13);
+  ctx.beginPath(); ctx.arc(x-ex,y+ey,er,0,6.2832); ctx.arc(x+ex,y+ey,er,0,6.2832); ctx.fill();
+  ctx.restore();
+}
+function drawPlane(ctx, x, y, k, tilt){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(tilt||0); ctx.scale(k,k);
+  ctx.shadowColor='rgba(0,255,220,.9)'; ctx.shadowBlur=14;
+  ctx.fillStyle='#8ffbe4';
+  ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(7,-4); ctx.lineTo(24,12); ctx.lineTo(24,19);
+  ctx.lineTo(7,11); ctx.lineTo(6,22); ctx.lineTo(14,26); ctx.lineTo(14,30); ctx.lineTo(0,25);
+  ctx.lineTo(-14,30); ctx.lineTo(-14,26); ctx.lineTo(-6,22); ctx.lineTo(-7,11); ctx.lineTo(-24,19);
+  ctx.lineTo(-24,12); ctx.lineTo(-7,-4); ctx.closePath(); ctx.fill();
+  ctx.shadowBlur=0; ctx.fillStyle='#0b5f6b';
+  ctx.beginPath(); ctx.ellipse(0,-8,4,10,0,0,6.2832); ctx.fill();
+  ctx.restore();
+}
+
+/* ============================================================
+   تحديث اللعبة
+   ============================================================ */
+function update(dt){
+  G.time += dt;
+  if(G.state!=='playing') return;
+  const P=G.player, w=WAVES[G.wave];
+
+  if(G.shake>0) G.shake = Math.max(0, G.shake-dt*3);
+  if(G.flash>0) G.flash = Math.max(0, G.flash-dt*2.5);
+
+  // --- حركة الطيار (الجويستيك) ---
+  let jx = G.joy.x, jy = G.joy.y;
+  if(G.keys['arrowleft']||G.keys['a']) jx -= 1;
+  if(G.keys['arrowright']||G.keys['d']) jx += 1;
+  if(G.keys['arrowup']||G.keys['w']) jy -= 1;
+  if(G.keys['arrowdown']||G.keys['s']) jy += 1;
+  const m=Math.hypot(jx,jy); if(m>1){jx/=m; jy/=m;}
+  const SPD=340;
+  P.x += jx*SPD*dt; P.z -= jy*SPD*dt;
+  P.x = clamp(P.x, -ARENA_X+26, ARENA_X-26);
+  P.z = clamp(P.z, 18, 430);
+
+  // --- إطلاق تلقائي (حركة واحدة بس) ---
+  P.cd -= dt;
+  if(P.cd<=0 && P.alive){
+    P.cd = 0.2;
+    let vx=0; const TM=G.monster;
+    if(TM && Math.abs(P.x-TM.x)<170) vx = clamp((TM.x-P.x)*1.3, -300, 300);
+    G.bullets.push({x:P.x,y:PLAYER_Y,z:P.z+18,vx:vx,vz:760,life:2.2,pr:7});
+    tone(760,420,.06,'square',.022);
+  }
+
+  // --- الوحش ---
+  const M=G.monster;
+  if(M){
+    M.t += dt;
+    if(M.hitFlash>0) M.hitFlash-=dt*4;
+    if(M.z > w.hover){ M.z = Math.max(w.hover, M.z - w.speed*dt); }
+    // اندفاع للوحش الأخير
+    if(w.pattern===4){
+      M.dashCd -= dt;
+      if(M.dashCd<=0){ M.dashCd=4.5; M.dashT=0.75; }
+      if(M.dashT>0){ M.dashT-=dt; M.z = Math.max(150, M.z-210*dt); }
+    }
+    M.x = Math.sin(M.t*0.85 + M.phase) * (ARENA_X*0.55);
+    M.y = PLAYER_Y + Math.sin(M.t*1.7)*12;
+
+    M.fireCd -= dt;
+    if(M.fireCd<=0){
+      M.fireCd = w.fire*(0.85+Math.random()*0.3);
+      shootPattern(M,w);
+    }
+    if(M.hp<=0){ killMonster(); return; }
+  }
+
+  // --- الأتباع (لا يطلقون نار) ---
+  for(let i=G.followers.length-1;i>=0;i--){
+    const f=G.followers[i];
+    f.t += dt; f.ang += dt*1.5;
+    const FM=G.monster; if(!FM) break;
+    f.x = FM.x + Math.cos(f.ang)*f.rad;
+    f.y = PLAYER_Y + Math.sin(f.ang*1.3)*45;
+    f.z = FM.z + Math.sin(f.ang*0.8)*40;
+    if(P.alive && P.inv<=0){
+      const d=Math.hypot(f.x-P.x, f.z-P.z);
+      if(d<52){ P.hp -= 6; P.inv=0.5; G.flash=0.5; G.shake=0.5; buzz(); tone(180,90,.12,'sawtooth',.05); }
+    }
+    if(f.hp<=0) G.followers.splice(i,1);
+  }
+
+  // --- رصاصات اللاعب ---
+  for(let i=G.bullets.length-1;i>=0;i--){
+    const b=G.bullets[i];
+    b.pz=b.z; b.x+=b.vx*dt; b.z+=b.vz*dt; b.life-=dt;
+    if(b.life<=0 || b.z>ZMAX+40){ G.bullets.splice(i,1); continue; }
+    let hitF=false;
+    for(let k=G.followers.length-1;k>=0;k--){
+      const f=G.followers[k];
+      if(b.pz<f.z+30 && b.z>=f.z-30 && Math.abs(b.x-f.x)<42 && Math.abs(b.y-f.y)<50){
+        f.hp=0; hitF=true; boom(.12,.08); tone(300,150,.08,'square',.04);
+        G.parts.push({x:f.x,y:f.y,z:f.z,vx:(Math.random()-.5)*120,vy:(Math.random()-.5)*120,vz:(Math.random()-.5)*120,life:.5,c:'#7dffb2'});
+        break;
+      }
+    }
+    if(hitF){ G.bullets.splice(i,1); continue; }
+    if(M && b.pz<M.z+34 && b.z>=M.z-34 && Math.abs(b.x-M.x)<M.r+10 && Math.abs(b.y-M.y)<M.r+14){
+      M.hp-=1; M.hitFlash=.8; G.shake=Math.max(G.shake,.25);
+      G.parts.push({x:b.x,y:b.y,z:M.z,vx:(Math.random()-.5)*160,vy:(Math.random()-.5)*160,vz:80,life:.4,c:'#ffe08a'});
+      tone(520,260,.08,'square',.05);
+      G.bullets.splice(i,1);
+    }
+  }
+
+  // --- رصاصات الوحوش ---
+  for(let i=G.ebullets.length-1;i>=0;i--){
+    const b=G.ebullets[i];
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.z+=b.vz*dt; b.life-=dt;
+    if(b.life<=0 || b.z<-60 || Math.abs(b.x)>900 || b.y<-200){ G.ebullets.splice(i,1); continue; }
+    if(P.alive && P.inv<=0){
+      const d=Math.hypot(b.x-P.x, (b.y-PLAYER_Y)*0.9, b.z-P.z);
+      if(d<PLAYER_R+10){
+        P.hp -= b.dmg; P.inv=0.55; G.flash=0.8; G.shake=0.7; buzz();
+        tone(220,70,.16,'sawtooth',.07);
+        G.ebullets.splice(i,1);
+        if(P.hp<=0){ P.hp=0; P.alive=false; gameOver(false); return; }
+      }
+    }
+  }
+
+  // --- جزيئات ---
+  for(let i=G.parts.length-1;i>=0;i--){
+    const p=G.parts[i];
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.z+=p.vz*dt; p.life-=dt;
+    if(p.life<=0) G.parts.splice(i,1);
+  }
+
+  // --- الشريط العلوي ---
+  hpfill.style.width = (P.hp/P.maxHp*100)+'%';
+  hpnum.textContent = Math.ceil(P.hp);
+  if(P.hp<30) hpfill.style.background='linear-gradient(90deg,#ef4444,#f97316)';
+  else hpfill.style.background='linear-gradient(90deg,#22c55e,#bef264)';
+}
+
+function shootPattern(M,w){
+  const P=G.player;
+  const dx=P.x-M.x, dy=PLAYER_Y-M.y, dz=P.z-M.z;
+  const L=Math.hypot(dx,dy,dz)||1;
+  const ux=dx/L, uy=dy/L, uz=dz/L;
+  const n = w.pattern>=2 ? (w.pattern>=3?3:2) : 1;
+  for(let i=0;i<n;i++){
+    const a = (i-(n-1)/2)*w.spread;
+    const ca=Math.cos(a), sa=Math.sin(a);
+    const vx=ux*ca-uz*sa, vz=ux*sa+uz*ca;
+    G.ebullets.push({x:M.x, y:M.y, z:M.z-20, vx:vx*w.bspeed, vy:uy*w.bspeed*0.5, vz:vz*w.bspeed,
+                      life:4, dmg:w.dmg, r:9});
+  }
+  if(w.pattern===4 && Math.random()<0.5){
+    G.ebullets.push({x:M.x, y:M.y, z:M.z-20, vx:(Math.random()-.5)*160, vy:-20, vz:-180, life:3, dmg:w.dmg, r:9});
+  }
+  tone(180,120,.09,'triangle',.035);
+}
+
+function killMonster(){
+  const M=G.monster, w=WAVES[G.wave];
+  for(let i=0;i<26;i++){
+    G.parts.push({x:M.x+(Math.random()-.5)*M.r, y:M.y+(Math.random()-.5)*M.r, z:M.z,
+      vx:(Math.random()-.5)*260, vy:(Math.random()-.5)*260, vz:(Math.random()-.5)*200+60, life:.9, c:'#ffb347'});
+  }
+  boom(.5,.25); G.shake=1; G.score += 100*(G.wave+1);
+  G.monster=null; G.followers.length=0; G.ebullets.length=0;
+  tone(400,60,.4,'sawtooth',.08);
+  if(G.wave>=WAVES.length-1){ gameOver(true); return; }
+  showBanner('اتقضي على '+w.name+' ✅');
+  setTimeout(()=>{ if(G.state==='playing') startWave(G.wave+1); }, 1300);
+}
+
+/* ============================================================
+   رسم الساحة (المكعب)
+   ============================================================ */
+function drawRoom(ctx){
+  const HW=ARENA_X, WH=250;
+  const tl=proj(-HW,WH,ZMAX), tr=proj(HW,WH,ZMAX), bl=proj(-HW,0,ZMAX), br=proj(HW,0,ZMAX);
+  const g=ctx.createLinearGradient(0,tl.y,0,bl.y);
+  g.addColorStop(0,'#0d2438'); g.addColorStop(1,'#061320');
+  ctx.fillStyle=g; ctx.fillRect(tl.x,tl.y,br.x-tl.x,bl.y-tl.y);
+  const nl=proj(-HW,0,0), nr=proj(HW,0,0);
+  ctx.beginPath(); ctx.moveTo(nl.x,nl.y); ctx.lineTo(nr.x,nr.y); ctx.lineTo(br.x,br.y); ctx.lineTo(bl.x,bl.y); ctx.closePath();
+  const gf=ctx.createLinearGradient(0,nl.y,0,bl.y);
+  gf.addColorStop(0,'#0a1c2c'); gf.addColorStop(1,'#071622');
+  ctx.fillStyle=gf; ctx.fill();
+  ctx.strokeStyle='rgba(0,255,220,.13)'; ctx.lineWidth=1;
+  for(let z=0;z<=ZMAX;z+=90){
+    const a=proj(-HW,0,z), b=proj(HW,0,z);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  for(let x=-HW;x<=HW;x+=85){
+    const a=proj(x,0,0), b=proj(x,0,ZMAX);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(0,255,220,.55)'; ctx.lineWidth=2;
+  const edges=[
+    [proj(-HW,0,0),proj(HW,0,0)],[proj(-HW,0,ZMAX),proj(HW,0,ZMAX)],
+    [proj(-HW,WH,0),proj(HW,WH,0)],[proj(-HW,WH,ZMAX),proj(HW,WH,ZMAX)],
+    [proj(-HW,0,0),proj(-HW,WH,0)],[proj(HW,0,0),proj(HW,WH,0)],
+    [proj(-HW,0,ZMAX),proj(-HW,WH,ZMAX)],[proj(HW,0,ZMAX),proj(HW,WH,ZMAX)],
+    [proj(-HW,WH,0),proj(-HW,WH,ZMAX)],[proj(HW,WH,0),proj(HW,WH,ZMAX)]
+  ];
+  edges.forEach(e=>{ ctx.beginPath(); ctx.moveTo(e[0].x,e[0].y); ctx.lineTo(e[1].x,e[1].y); ctx.stroke(); });
+  ctx.fillStyle='rgba(120,255,225,.2)'; ctx.textAlign='center';
+  ctx.font='bold '+Math.max(12,Math.round(bl.y-tl.y))+'px sans-serif';
+  ctx.fillText('مكعب الوحوش', CX, (tl.y+bl.y)/2);
+}
+
+function drawArena(){
+  const ctx=actx;
+  ctx.clearRect(0,0,W,H);
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#081826'); bg.addColorStop(1,'#03080e');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  ctx.save();
+  if(G.shake>0){ const s=G.shake*7; ctx.translate((Math.random()-.5)*s,(Math.random()-.5)*s); }
+  drawRoom(ctx);
+
+  const M=G.monster;
+  for(const f of G.followers){
+    const p=proj(f.x,f.y,f.z);
+    drawFace(ctx,PICS[WAVES[G.wave].key],p.x,p.y,Math.max(4,34*p.k),0);
+  }
+  if(M){
+    const p=proj(M.x,M.y,M.z);
+    const gg=ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,Math.max(10,M.r*p.k*1.6));
+    gg.addColorStop(0,'rgba(255,60,60,.35)'); gg.addColorStop(1,'rgba(255,60,60,0)');
+    ctx.fillStyle=gg; ctx.fillRect(p.x-M.r*p.k*1.7,p.y-M.r*p.k*1.7,M.r*p.k*3.4,M.r*p.k*3.4);
+    drawFace(ctx,PICS[WAVES[G.wave].key],p.x,p.y,Math.max(6,M.r*p.k),Math.max(0,M.hitFlash));
+    const bw=Math.max(40,M.r*p.k*1.6), bx=p.x-bw/2, by=p.y-M.r*p.k-14;
+    ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(bx,by,bw,6);
+    ctx.fillStyle='#ef4444'; ctx.fillRect(bx,by,bw*(M.hp/M.maxhp),6);
+  }
+  for(const b of G.ebullets){
+    const p=proj(b.x,b.y,b.z);
+    const r=Math.max(2.5,b.r*p.k);
+    ctx.shadowColor='rgba(255,80,80,.9)'; ctx.shadowBlur=10;
+    ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,6.2832); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  for(const b of G.bullets){
+    const p=proj(b.x,b.y,b.z);
+    const r=Math.max(2,b.pr*p.k);
+    ctx.shadowColor='rgba(180,255,120,.9)'; ctx.shadowBlur=8;
+    ctx.fillStyle='#d9ff7a'; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,6.2832); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  for(const p of G.parts){
+    const q=proj(p.x,p.y,p.z);
+    const r=Math.max(1.5,6*p.k);
+    ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(q.x,q.y,r,0,6.2832); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+  const P=G.player;
+  if(P.alive){
+    const p=proj(P.x,PLAYER_Y,P.z);
+    const tilt=clamp(G.joy.x*0.5,-0.5,0.5);
+    ctx.globalAlpha = P.inv>0 ? 0.45 : 1;
+    drawPlane(ctx,p.x,p.y,p.k*1.1,tilt);
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+
+  if(G.flash>0){ ctx.fillStyle='rgba(255,0,0,'+(G.flash*0.5)+')'; ctx.fillRect(0,0,W,H); }
+}
+
+/* ============================================================
+   نسخة الطائرة (الشريط العلوي)
+   ============================================================ */
+const MINI = {
+  m:{x:1.05, hp:26, max:26, y:.55, t:0},
+  p:{x:.12, y:.5, t:0, cd:0},
+  bs:[], rs:[]
+};
+function miniUpdate(dt){
+  MINI.m.t+=dt; MINI.p.t+=dt;
+  const target=.74;
+  if(MINI.m.x>target) MINI.m.x=Math.max(target, MINI.m.x - (0.085+MINI.m.t*0.004)*dt*2.4);
+  MINI.m.y = .52 + Math.sin(MINI.m.t*1.4)*.13;
+  MINI.p.y = .5 + Math.sin(MINI.p.t*2.2)*.22;
+  MINI.p.x = .12 + Math.sin(MINI.p.t*0.7)*.02;
+  MINI.p.cd-=dt;
+  if(MINI.p.cd<=0){
+    MINI.p.cd=.24;
+    MINI.bs.push({x:MINI.p.x+.05, y:MINI.p.y});
+    tone(900,600,.05,'square',.012);
+  }
+  for(let i=MINI.bs.length-1;i>=0;i--){
+    const b=MINI.bs[i]; b.x+=1.05*dt;
+    if(b.x>1.2){ MINI.bs.splice(i,1); continue; }
+    if(Math.abs(b.x-MINI.m.x)<0.05 && Math.abs(b.y-MINI.m.y)<0.2){
+      MINI.m.hp-=1; MINI.bs.splice(i,1);
+      MINI.rs.push({x:MINI.m.x,y:MINI.m.y,t:0});
+      tone(600,300,.05,'square',.02);
+    }
+  }
+  for(let i=MINI.rs.length-1;i>=0;i--){ MINI.rs[i].t+=dt; if(MINI.rs[i].t>0.4) MINI.rs.splice(i,1); }
+  if(MINI.m.hp<=0){ MINI.m.hp=MINI.m.max; MINI.m.x=1.08; MINI.m.t=0; }
+}
+function miniDraw(){
+  const ctx=mctx; ctx.clearRect(0,0,MW,MH);
+  const g=ctx.createLinearGradient(0,0,0,MH);
+  g.addColorStop(0,'#123a55'); g.addColorStop(.7,'#0b2130'); g.addColorStop(1,'#081722');
+  ctx.fillStyle=g; ctx.fillRect(0,0,MW,MH);
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  for(let i=0;i<26;i++){ const x=(i*97%MW), y=(i*53%MH); ctx.fillRect(x,y,1.5,1.5); }
+  ctx.fillStyle='rgba(0,255,220,.08)'; ctx.fillRect(0,MH*0.78,MW,MH*0.22);
+  ctx.strokeStyle='rgba(0,255,220,.3)'; ctx.beginPath(); ctx.moveTo(0,MH*0.78); ctx.lineTo(MW,MH*0.78); ctx.stroke();
+
+  const mk = Math.min(MH*0.30, 32);
+  // أتباع الوحش (لا يطلقون نار)
+  for(let i=0;i<2;i++){
+    const fx=MINI.m.x+0.12+i*0.1, fy=MINI.m.y+0.10+(i%2?0.06:-0.04);
+    drawFace(ctx,PICS.wolby,fx*MW,fy*MH,mk*0.5,0);
+  }
+  // الوحش الأول
+  drawFace(ctx,PICS.wolby,MINI.m.x*MW,MINI.m.y*MH,mk,0);
+  // رصاصات
+  ctx.fillStyle='#d9ff7a';
+  for(const b of MINI.bs){ ctx.fillRect(b.x*MW, b.y*MH-1.5, 9, 3); }
+  // الطائرة
+  const px=MINI.p.x*MW, py=MINI.p.y*MH, ps=Math.min(MH*0.014,1.5);
+  ctx.save(); ctx.translate(px,py); ctx.scale(ps*4,ps*4);
+  ctx.fillStyle='#9dfff0'; ctx.shadowColor='rgba(0,255,220,.8)'; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-6,-6); ctx.lineTo(-3,0); ctx.lineTo(-6,6); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // انفجارات
+  for(const r of MINI.rs){
+    ctx.globalAlpha=1-r.t/0.4; ctx.fillStyle='#ffb347';
+    ctx.beginPath(); ctx.arc(r.x*MW,r.y*MH,mk*(0.4+r.t),0,6.2832); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // شريط صحة الوحش في الشريط
+  ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(6,MH-11,90,6);
+  ctx.fillStyle='#ff6b6b'; ctx.fillRect(6,MH-11,90*(MINI.m.hp/MINI.m.max),6);
+}
+
+/* ============================================================
+   الحلقة الرئيسية
+   ============================================================ */
+let last=performance.now();
+function loop(now){
+  let dt=(now-last)/1000; last=now;
+  if(dt>0.05) dt=0.05;
+  update(dt);
+  drawArena();
+  miniUpdate(dt); miniDraw();
+  requestAnimationFrame(loop);
+}
+
+/* ============================================================
+   قائمة الوحوش في الشاشة الأولى
+   ============================================================ */
+(function roster(){
+  const r=$('#roster');
+  WAVES.forEach((w,i)=>{
+    const d=document.createElement('div'); d.className='m';
+    d.innerHTML='<img src="'+IMG[w.key]+'" alt="'+w.name+'"><b>'+(i+1)+'. '+w.name+'</b>';
+    r.appendChild(d);
+  });
+})();
+
+/* ============================================================
+   تشغيل
+   ============================================================ */
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
