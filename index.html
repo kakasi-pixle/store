@@ -1,266 +1,407 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>صيد العبيد - عبد</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#050a12">
+<title>الولبي المتخلخل — صيد الوحوش</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:"Segoe UI",Tahoma,"Cairo",sans-serif;
-    background:radial-gradient(circle at 50% 20%,#1d2430,#08090d 70%);
-    color:#e8e8e8;min-height:100vh;display:flex;align-items:center;justify-content:center;
-    overflow-x:hidden;
-  }
-  .app{width:100%;max-width:520px;padding:16px;text-align:center}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#050a12;color:#eaf6ff;
+    font-family:"Segoe UI",Tahoma,system-ui,-apple-system,sans-serif;
+    touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+  #app{position:fixed;inset:0;overflow:hidden}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column}
+  .hidden{display:none!important}
 
-  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-  h1{font-size:20px;color:#ff5b5b;text-shadow:0 0 14px #ff2b2b66}
-  .counter{font-size:14px;background:#ffffff12;border:1px solid #ffffff22;padding:6px 12px;border-radius:20px}
+  /* ===== شاشة البداية ===== */
+  #intro{z-index:10;align-items:center;justify-content:center;gap:14px;padding:16px;
+    background:radial-gradient(120% 80% at 50% 0%,#123047 0%,#071320 55%,#03070d 100%);overflow:auto}
+  #intro h1{font-size:clamp(22px,7vw,34px);letter-spacing:1px;text-align:center;
+    text-shadow:0 0 18px rgba(0,255,220,.55);color:#d8fff7}
+  #intro p.sub{font-size:13px;opacity:.75;text-align:center;margin-top:-6px}
+  .cube-box{width:190px;height:190px;perspective:900px;flex:0 0 auto}
+  .cube{position:relative;width:190px;height:190px;transform-style:preserve-3d;animation:spin 14s linear infinite}
+  .cube .face{position:absolute;width:190px;height:190px;border:1px solid rgba(0,255,220,.5);
+    background:rgba(8,22,34,.9);overflow:hidden;backface-visibility:hidden}
+  .cube .face img{width:100%;height:100%;object-fit:cover;display:block}
+  .cube .f{transform:rotateY(0deg) translateZ(95px)}
+  .cube .bk{transform:rotateY(180deg) translateZ(95px)}
+  .cube .r{transform:rotateY(90deg) translateZ(95px)}
+  .cube .l{transform:rotateY(-90deg) translateZ(95px)}
+  .cube .t{transform:rotateX(90deg) translateZ(95px)}
+  .cube .bt{transform:rotateX(-90deg) translateZ(95px)}
+  @keyframes spin{from{transform:rotateX(-20deg) rotateY(0)}to{transform:rotateX(-20deg) rotateY(360deg)}}
+  .glow{position:relative}
+  .glow:after{content:"";position:absolute;left:50%;bottom:-14px;width:150px;height:26px;transform:translateX(-50%);
+    background:radial-gradient(50% 50% at 50% 50%,rgba(0,255,210,.55),transparent 70%);filter:blur(4px)}
+  .big-btn{margin-top:6px;padding:15px 46px;border:0;border-radius:40px;font-size:20px;font-weight:700;
+    color:#02121a;background:linear-gradient(180deg,#5ef2c8,#13c8a0);box-shadow:0 0 26px rgba(0,255,200,.45);
+    font-family:inherit;cursor:pointer;animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  .roster{display:flex;gap:8px;overflow-x:auto;width:100%;padding:4px 6px 10px;-webkit-overflow-scrolling:touch}
+  .roster .m{flex:0 0 auto;width:72px;text-align:center;font-size:10px;opacity:.9}
+  .roster .m img{width:58px;height:58px;object-fit:cover;border-radius:50%;border:2px solid rgba(0,255,220,.5);
+    background:#0b1a26;display:block;margin:0 auto 4px}
+  .roster .m b{display:block;font-weight:600;line-height:1.2}
 
-  .stage{
-    position:relative;background:#0f1219;border:1px solid #ffffff18;border-radius:18px;
-    padding:18px 14px 22px;box-shadow:0 20px 50px #0009;
-  }
-  .stage.shake{animation:shake .3s}
-  @keyframes shake{0%,100%{transform:translate(0)}25%{transform:translate(-7px,4px)}50%{transform:translate(6px,-3px)}75%{transform:translate(-4px,-4px)}}
+  /* ===== شاشة اللعبة ===== */
+  #game{z-index:5}
+  #topbar{position:relative;height:15vh;min-height:88px;max-height:140px;flex:0 0 auto;
+    border-bottom:1px solid rgba(0,255,220,.25);background:#04090f}
+  #mini{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .mini-tag{position:absolute;top:4px;right:8px;font-size:11px;padding:2px 8px;border-radius:20px;
+    background:rgba(0,0,0,.5);border:1px solid rgba(0,255,220,.4);color:#7ff5d8;pointer-events:none}
+  #muteBtn{position:absolute;top:4px;left:8px;z-index:6;width:34px;height:34px;border-radius:50%;
+    border:1px solid rgba(0,255,220,.4);background:rgba(0,0,0,.5);color:#7ff5d8;font-size:15px;cursor:pointer}
+  #stage{position:relative;flex:1 1 auto;overflow:hidden}
+  #arena{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+  #hud{position:absolute;z-index:3;top:6px;right:8px;left:8px;display:flex;align-items:center;gap:8px;pointer-events:none}
+  .hpwrap{flex:1;height:15px;border:1px solid rgba(90,255,170,.55);border-radius:9px;background:rgba(0,0,0,.45);overflow:hidden}
+  #hpfill{height:100%;width:100%;background:linear-gradient(90deg,#22c55e,#bef264);transition:width .12s}
+  #hpnum{font-size:12px;min-width:56px;text-align:center;background:rgba(0,0,0,.45);padding:3px 6px;border-radius:8px}
+  #wavelabel{font-size:12px;padding:3px 10px;border-radius:10px;background:rgba(0,0,0,.45);
+    border:1px solid rgba(0,255,220,.35);color:#ffd166;white-space:nowrap}
+  #banner{position:absolute;z-index:3;left:50%;top:34%;transform:translateX(-50%);font-size:clamp(18px,6vw,28px);
+    font-weight:700;color:#ffe08a;text-shadow:0 0 18px rgba(255,180,0,.6);pointer-events:none;opacity:0;transition:opacity .3s;text-align:center}
+  #banner.show{opacity:1}
 
-  .monster-name{font-size:22px;font-weight:bold;color:#ffd166;margin-bottom:10px;min-height:30px}
+  /* ===== الجويستيك ===== */
+  #joyBase{position:fixed;z-index:8;width:120px;height:120px;border-radius:50%;border:2px solid rgba(0,255,220,.35);
+    background:rgba(0,255,220,.07);transform:translate(-50%,-50%);pointer-events:none;display:none}
+  #joyKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#9dfff0,#12b79a);box-shadow:0 0 18px rgba(0,255,220,.6)}
+  #joyLayer{position:absolute;inset:0;z-index:2}
 
-  .hp-wrap{margin-bottom:18px}
-  .hp-bar{height:20px;background:#241b1b;border:1px solid #ffffff22;border-radius:12px;overflow:hidden;position:relative}
-  .hp-fill{height:100%;width:100%;background:linear-gradient(90deg,#43a047,#8bc34a);transition:width .25s ease}
-  .hp-fill.low{background:linear-gradient(90deg,#e53935,#ff7043)}
-  .hp-text{font-size:13px;margin-top:6px;color:#ff9a9a}
-
-  /* ===== المكعب ===== */
-  .cube-wrap{perspective:900px;width:200px;height:200px;margin:0 auto;position:relative}
-  .cube-wrap.punch{animation:punch .25s ease-out}
-  @keyframes punch{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
-
-  .cube{position:relative;width:200px;height:200px;transform-style:preserve-3d;animation:spin 11s linear infinite}
-  @keyframes spin{from{transform:rotateX(-18deg) rotateY(0)}to{transform:rotateX(-18deg) rotateY(360deg)}}
-  .cube.spawn{animation:spawn .6s ease-out}
-  @keyframes spawn{from{transform:rotateX(-18deg) rotateY(0) scale(.1);opacity:0}to{transform:rotateX(-18deg) rotateY(0) scale(1);opacity:1}}
-
-  .face{
-    position:absolute;width:200px;height:200px;background-size:cover;background-position:center;
-    border:2px solid #00000088;box-shadow:inset 0 0 45px #0009;border-radius:6px;
-  }
-  .front{transform:translateZ(100px)}
-  .back{transform:rotateY(180deg) translateZ(100px)}
-  .right{transform:rotateY(90deg) translateZ(100px)}
-  .left{transform:rotateY(-90deg) translateZ(100px)}
-  .top{transform:rotateX(90deg) translateZ(100px)}
-  .bottom{transform:rotateX(-90deg) translateZ(100px)}
-
-  /* شكل المكعب قبل بدء القتال */
-  .cube.idle{animation:none;transform:rotateX(-18deg) rotateY(25deg)}
-  .cube.idle .face{background:linear-gradient(145deg,#2b3240,#12151c)}
-  .cube.idle .face::after{content:"؟";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:90px;color:#3c4354;font-weight:bold}
-
-  /* موت الوحش: تتطاير الوحوش */
-  .cube.dead{animation:none;transform:rotateX(-18deg) rotateY(25deg);transition:transform .5s}
-  .cube.dead .face{transition:transform .9s cubic-bezier(.2,.8,.3,1),opacity .9s;opacity:0}
-  .cube.dead .front{transform:translateZ(100px) translate(300px,150px) rotateZ(130deg)}
-  .cube.dead .back{transform:rotateY(180deg) translateZ(100px) translate(-300px,-120px) rotateZ(-150deg)}
-  .cube.dead .right{transform:rotateY(90deg) translateZ(100px) translate(200px,-220px) rotateZ(90deg)}
-  .cube.dead .left{transform:rotateY(-90deg) translateZ(100px) translate(-200px,220px) rotateZ(-90deg)}
-  .cube.dead .top{transform:rotateX(90deg) translateZ(100px) translate(-260px,-180px) rotateX(120deg)}
-  .cube.dead .bottom{transform:rotateX(-90deg) translateZ(100px) translate(260px,180px) rotateX(-120deg)}
-
-  .hint{margin-top:18px;font-size:14px;color:#9aa4b2}
-  .msg{margin-top:10px;font-size:18px;color:#ff6b6b;min-height:26px;font-weight:bold}
-  .msg.win{color:#4ade80}
-
-  .next{
-    margin-top:12px;padding:12px 22px;font-size:16px;font-weight:bold;cursor:pointer;
-    border:0;border-radius:12px;background:linear-gradient(180deg,#ef4444,#b91c1c);color:#fff;
-    box-shadow:0 8px 20px #7f1d1d88;
-  }
-  .next:hover{filter:brightness(1.12)}
-
-  /* الدم */
-  .particles{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:18px}
-  .drop{position:absolute;top:45%;left:50%;width:10px;height:10px;background:#a3000f;border-radius:50%;
-    animation:fall .8s ease-out forwards}
-  @keyframes fall{
-    from{transform:translate(0,0) scale(1);opacity:1}
-    to{transform:translate(var(--x),var(--y)) scale(.25);opacity:0}
-  }
-  .dmg{position:absolute;top:34%;left:50%;font-size:26px;font-weight:bold;color:#ff4d4d;
-    text-shadow:0 2px 6px #000;animation:floatUp .9s ease-out forwards}
-  @keyframes floatUp{from{transform:translate(-50%,0);opacity:1}to{transform:translate(-50%,-90px);opacity:0}}
-
-  .vignette{position:absolute;inset:0;pointer-events:none;border-radius:18px;opacity:0;
-    background:radial-gradient(circle,transparent 45%,#ff000055 100%);transition:opacity .25s}
-  .vignette.on{opacity:1}
-  footer{margin-top:12px;font-size:12px;color:#5c6675}
+  /* ===== شاشة النهاية ===== */
+  #over{z-index:20;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;
+    background:rgba(3,7,13,.92);backdrop-filter:blur(3px)}
+  #overTitle{font-size:clamp(26px,9vw,44px);font-weight:800;color:#ff5b5b;text-shadow:0 0 26px rgba(255,40,40,.7)}
+  #overTitle.win{color:#7dffb2;text-shadow:0 0 26px rgba(0,255,140,.6)}
+  #overSub{font-size:14px;opacity:.85;line-height:1.8}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn2{padding:12px 26px;border-radius:30px;border:1px solid rgba(0,255,220,.5);background:rgba(0,255,220,.12);
+    color:#dffff7;font-size:16px;font-family:inherit;cursor:pointer}
+  .btn2.solid{background:linear-gradient(180deg,#5ef2c8,#13c8a0);color:#02121a;border:0;font-weight:700}
 </style>
 </head>
 <body>
-<div class="app">
+<div id="app">
 
-  <header>
-    <h1>صيد الوحوش</h1>
-    <div class="counter">قتلى: <span id="kills">0</span> / <span id="total">5</span></div>
-  </header>
-
-  <div class="stage" id="stage">
-    <div class="monster-name" id="name">مجهول</div>
-
-    <div class="hp-wrap">
-      <div class="hp-bar"><div class="hp-fill" id="hpFill"></div></div>
-      <div class="hp-text">HP: <span id="hpText">100</span> / <span id="hpMax">100</span></div>
-    </div>
-
-    <div class="cube-wrap" id="cubeWrap">
-      <div class="cube idle" id="cube">
-        <div class="face front"></div>
-        <div class="face back"></div>
-        <div class="face right"></div>
-        <div class="face left"></div>
-        <div class="face top"></div>
-        <div class="face bottom"></div>
+  <!-- أول بوص: الصورة جوه مكعب -->
+  <div id="intro" class="screen">
+    <h1>الولبي المتخلخل</h1>
+    <p class="sub">مهمة صيد الوحوش — أنت الطيار 🛩️</p>
+    <div class="cube-box glow">
+      <div class="cube">
+        <div class="face f"><img src="https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg" alt="الولبي المتخلخل"></div>
+        <div class="face bk"></div>
+        <div class="face r"></div>
+        <div class="face l"></div>
+        <div class="face t"></div>
+        <div class="face bt"></div>
       </div>
     </div>
-
-    <div class="hint" id="hint">اضغط على العبد للبدء ⚔️</div>
-    <div class="msg" id="msg"></div>
-    <button class="next" id="nextBtn" hidden> العبد الي بعدو 👹</button>
-
-    <div class="particles" id="particles"></div>
-    <div class="vignette" id="vignette"></div>
+    <button class="big-btn" id="startBtn">ابدأ المهمة</button>
+    <div class="roster" id="roster"></div>
   </div>
 
-  <footer>كل ضربة تقلّل HP العبد.. اضغط حتى يموت 💀</footer>
+  <!-- شاشة اللعب -->
+  <div id="game" class="screen hidden">
+    <div id="topbar">
+      <canvas id="mini"></canvas>
+      <div class="mini-tag">نسخة الطائرة ✈️</div>
+      <button id="muteBtn">🔊</button>
+    </div>
+    <div id="stage">
+      <canvas id="arena"></canvas>
+      <div id="joyLayer"></div>
+      <div id="hud">
+        <div class="hpwrap"><div id="hpfill"></div></div>
+        <div id="hpnum">100</div>
+        <div id="wavelabel">الموجة 1</div>
+      </div>
+      <div id="banner"></div>
+    </div>
+  </div>
+
+  <!-- النهاية -->
+  <div id="over" class="screen hidden">
+    <div id="overTitle">لقد قتلت الزنجي</div>
+    <div id="overSub"></div>
+    <div class="row">
+      <button class="btn2 solid" id="againBtn">إعادة</button>
+      <button class="btn2" id="menuBtn">القائمة</button>
+    </div>
+  </div>
+
+  <div id="joyBase"><div id="joyKnob"></div></div>
 </div>
 
 <script>
-/* ====== بيانات الوحوش ====== */
-const monsters = [
-  { name:"الولبي المتخلخل",              img:"https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg", hp:100 },
-  { name:"القزم الاسود",                 img:"https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg", hp:100 },
-  { name:"الملتهم الاحمق",               img:"https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg", hp:100 },
-  { name:"الابيض الشرس",                 img:"https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg", hp:100 },
-  { name:"المجهول المقرف الابيض الكريه", img:"https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg", hp:67 }
+/* ============================================================
+   بيانات الوحوش والصور
+   ============================================================ */
+const IMG = {
+  wolby : 'https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg',  // 1 الولبي المتخلخل
+  dwarf : 'https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg',  // 2 القزم الاسود
+  eater : 'https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg',  // 3 الملتهم الاحمق
+  fierce: 'https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg',  // 4 الابيض الشرس
+  horror: 'https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg'   // 5 المجهول المقرف الابيض الكريه
+};
+const WAVES = [
+  {key:'wolby' , name:'الولبي المتخلخل'              , hp:8 , speed:95 , hover:290, fire:3.2, bspeed:230, spread:0   , fol:2, dmg:8 , pattern:0, r:78},
+  {key:'dwarf' , name:'القزم الاسود'                 , hp:14, speed:115, hover:275, fire:2.4, bspeed:280, spread:0.14, fol:3, dmg:9 , pattern:1, r:74},
+  {key:'eater' , name:'الملتهم الاحمق'               , hp:22, speed:135, hover:260, fire:1.8, bspeed:320, spread:0.30, fol:3, dmg:11, pattern:2, r:72},
+  {key:'fierce', name:'الابيض الشرس'                 , hp:30, speed:155, hover:245, fire:1.4, bspeed:360, spread:0.45, fol:4, dmg:12, pattern:3, r:70},
+  {key:'horror', name:'المجهول المقرف الابيض الكريه' , hp:42, speed:175, hover:230, fire:1.0, bspeed:410, spread:0.60, fol:5, dmg:14, pattern:4, r:68}
 ];
 
-let idx = -1, hp = 0, kills = 0, phase = "idle";   // idle | fight | dead | done
+/* ============================================================
+   تحميل الصور
+   ============================================================ */
+const PICS = {};
+for (const k in IMG){ const im = new Image(); im.crossOrigin='anonymous'; im.src = IMG[k]; PICS[k]=im; }
 
-const $ = id => document.getElementById(id);
-const cube = $("cube"), wrap = $("cubeWrap"), stage = $("stage"),
-      particles = $("particles"), vignette = $("vignette"),
-      hpFill = $("hpFill"), hpText = $("hpText"), hpMax = $("hpMax"),
-      nameEl = $("name"), msg = $("msg"), hint = $("hint"),
-      nextBtn = $("nextBtn"), killsEl = $("kills");
+/* ============================================================
+   عناصر DOM
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const intro = $('#intro'), game = $('#game'), over = $('#over');
+const arena = $('#arena'), mini = $('#mini');
+const hpfill = $('#hpfill'), hpnum = $('#hpnum'), wavelabel = $('#wavelabel'), banner = $('#banner');
+const joyBase = $('#joyBase'), joyKnob = $('#joyKnob'), joyLayer = $('#joyLayer');
+const muteBtn = $('#muteBtn');
+const actx = arena.getContext('2d'), mctx = mini.getContext('2d');
 
-$("total").textContent = monsters.length;
-
-/* ====== عرض الوحش على أوجه المكعب ====== */
-function paint(url){
-  document.querySelectorAll(".cube .face").forEach(f => {
-    f.style.backgroundImage = url ? `url("${url}")` : "none";
-  });
+/* ============================================================
+   صوت بسيط
+   ============================================================ */
+let AC=null, MUTE=false;
+function ac(){ try{ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended')AC.resume(); }catch(e){AC=null;} return AC; }
+function tone(f1,f2,dur,type,vol){
+  const c=ac(); if(!c||MUTE) return;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f1,c.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(40,f2),c.currentTime+dur);
+  g.gain.setValueAtTime(vol||0.05,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dur);
+  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+dur+0.02);
 }
-
-/* ====== إظهار وحش جديد ====== */
-function spawn(i){
-  idx = i;
-  const m = monsters[i];
-  hp = m.hp;
-  hpMax.textContent = m.hp;
-  hpText.textContent = hp;
-  hpFill.style.width = "100%";
-  hpFill.classList.remove("low");
-  nameEl.textContent = m.name;
-  msg.textContent = "";
-  msg.classList.remove("win");
-  nextBtn.hidden = true;
-  particles.innerHTML = "";
-  paint(m.img);
-  cube.classList.remove("idle","dead");
-  cube.classList.add("spawn");
-  setTimeout(()=>cube.classList.remove("spawn"), 620);
-  phase = "fight";
-  hint.textContent = "اضغط على العبد للهجوم!";
+function boom(dur,vol){
+  const c=ac(); if(!c||MUTE) return;
+  const n=Math.floor(c.sampleRate*dur), b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);
+  const s=c.createBufferSource(); s.buffer=b;
+  const g=c.createGain(); g.gain.value=vol||0.18;
+  s.connect(g); g.connect(c.destination); s.start();
 }
+function buzz(){ if(navigator.vibrate) try{navigator.vibrate(35);}catch(e){} }
 
-/* ====== الدم + رقم الضربة ====== */
-function blood(dmgValue){
-  for(let i=0;i<14;i++){
-    const d = document.createElement("div");
-    d.className = "drop";
-    const x = (Math.random()*260-130) + "px";
-    const y = (Math.random()*220-60)  + "px";
-    const s = (6+Math.random()*10) + "px";
-    d.style.setProperty("--x", x);
-    d.style.setProperty("--y", y);
-    d.style.width = s; d.style.height = s;
-    d.style.background = Math.random() > .5 ? "#a3000f" : "#d10a1c";
-    particles.appendChild(d);
-    setTimeout(()=>d.remove(), 850);
+/* ============================================================
+   حالة اللعبة
+   ============================================================ */
+const ARENA_X = 170, ZMAX = 900, CAM_H = 380, D0 = 350;
+const PLAYER_Y = 95, PLAYER_R = 34;
+const G = {
+  state:'intro', wave:0, score:0, time:0, shake:0, flash:0,
+  monster:null, followers:[], bullets:[], ebullets:[], parts:[],
+  player:{x:0,z:70,hp:100,maxHp:100,cd:0,inv:0,alive:true},
+  joy:{on:false,id:null,ox:0,oy:0,x:0,y:0},
+  keys:{}
+};
+
+/* ============================================================
+   القياسات
+   ============================================================ */
+let W=0,H=0,CX=0,horizon=0,DPR=1, MW=0,MH=0;
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio||1);
+  const st = $('#stage').getBoundingClientRect();
+  W = Math.max(1,st.width); H = Math.max(1,st.height);
+  arena.width = W*DPR; arena.height = H*DPR;
+  arena.style.width = W+'px'; arena.style.height = H+'px';
+  actx.setTransform(DPR,0,0,DPR,0,0);
+  CX = W/2; horizon = H*0.16;
+
+  const tb = $('#topbar').getBoundingClientRect();
+  MW = Math.max(1,tb.width); MH = Math.max(1,tb.height);
+  mini.width = MW*DPR; mini.height = MH*DPR;
+  mini.style.width = MW+'px'; mini.style.height = MH+'px';
+  mctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=>setTimeout(resize,250));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+/* ============================================================
+   الإسقاط (كاميرا حقيقية)
+   ============================================================ */
+function proj(x,y,z){
+  const s = D0/(D0+Math.max(0,z));
+  const k = (H-horizon)*s/CAM_H;
+  return { x: CX + x*k, y: horizon + (CAM_H-y)*k, k };
+}
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+
+/* ============================================================
+   الجويستيك (سحب في أي مكان بالشاشة)
+   ============================================================ */
+function joyStart(e){
+  if(G.state!=='playing') return;
+  const t = e.touches? e.touches[0] : e;
+  G.joy.on=true; G.joy.id = (e.touches? e.touches[0].identifier : e.pointerId);
+  G.joy.ox=t.clientX; G.joy.oy=t.clientY; G.joy.x=0; G.joy.y=0;
+  joyBase.style.display='block';
+  joyBase.style.left=t.clientX+'px'; joyBase.style.top=t.clientY+'px';
+  joyKnob.style.transform='translate(0px,0px)';
+  e.preventDefault();
+}
+function joyMove(e){
+  if(!G.joy.on) return;
+  const list = e.touches? Array.from(e.touches) : [e];
+  const t = list.find(x=> (e.touches? x.identifier : x.pointerId) === G.joy.id) || list[0];
+  if(!t) return;
+  const dx = t.clientX-G.joy.ox, dy = t.clientY-G.joy.oy;
+  const R = 52, d = Math.hypot(dx,dy);
+  const kk = d>R? R/d : 1;
+  G.joy.x = (dx*kk)/R; G.joy.y = (dy*kk)/R;
+  joyKnob.style.transform = 'translate('+(dx*kk)+'px,'+(dy*kk)+'px)';
+  e.preventDefault();
+}
+function joyEnd(){
+  G.joy.on=false; G.joy.x=0; G.joy.y=0; joyBase.style.display='none';
+}
+joyLayer.addEventListener('touchstart', joyStart, {passive:false});
+joyLayer.addEventListener('touchmove', joyMove, {passive:false});
+joyLayer.addEventListener('touchend', joyEnd);
+joyLayer.addEventListener('touchcancel', joyEnd);
+joyLayer.addEventListener('mousedown', joyStart);
+window.addEventListener('mousemove', joyMove);
+window.addEventListener('mouseup', joyEnd);
+
+window.addEventListener('keydown', e=>{ G.keys[e.key.toLowerCase()]=true; if(e.key===' ') e.preventDefault(); });
+window.addEventListener('keyup',   e=>{ G.keys[e.key.toLowerCase()]=false; });
+
+/* ============================================================
+   بدء وإيقاف
+   ============================================================ */
+function startGame(){
+  G.state='playing'; G.wave=0; G.score=0; G.time=0;
+  G.bullets.length=0; G.ebullets.length=0; G.parts.length=0;
+  G.player.x=0; G.player.z=70; G.player.hp=100; G.player.cd=0; G.player.inv=0; G.player.alive=true;
+  G.shake=0; G.flash=0;
+  intro.classList.add('hidden'); over.classList.add('hidden'); game.classList.remove('hidden');
+  resize();
+  startWave(0);
+}
+function startWave(i){
+  G.wave=i; const w=WAVES[i];
+  G.monster = { x:0, y:PLAYER_Y, z:640, t:0, phase:Math.random()*6, hp:w.hp, maxhp:w.hp,
+                r:w.r, fireCd:w.fire*0.8, dashCd:5, dashT:0, hitFlash:0 };
+  G.followers.length=0;
+  for(let k=0;k<w.fol;k++){
+    G.followers.push({ang:Math.random()*6.28, rad:52+Math.random()*40, x:0, y:PLAYER_Y, z:640, hp:1, t:Math.random()*6});
   }
-  const n = document.createElement("div");
-  n.className = "dmg";
-  n.textContent = "-" + dmgValue;
-  particles.appendChild(n);
-  setTimeout(()=>n.remove(), 950);
+  wavelabel.textContent = 'الموجة '+(i+1)+' — '+w.name;
+  showBanner(w.name+' ظهر!');
+  tone(220,520,.18,'square',.05);
+}
+function showBanner(txt){ banner.textContent=txt; banner.classList.add('show'); clearTimeout(showBanner._t);
+  showBanner._t = setTimeout(()=>banner.classList.remove('show'), 1400); }
 
-  vignette.classList.add("on");
-  setTimeout(()=>vignette.classList.remove("on"), 180);
-  stage.classList.add("shake");
-  setTimeout(()=>stage.classList.remove("shake"), 320);
-  wrap.classList.add("punch");
-  setTimeout(()=>wrap.classList.remove("punch"), 260);
+function gameOver(win){
+  G.state = win? 'won':'dead';
+  const t=$('#overTitle'), s=$('#overSub');
+  if(win){ t.textContent='انتهت المهمة! 🏆'; t.classList.add('win');
+    s.innerHTML='قتلت كل الوحوش الخمسة 🔪<br>النقاط: '+G.score; }
+  else { t.textContent='لقد قتلت الزنجي'; t.classList.remove('win');
+    s.innerHTML='الزنجي موت... وبقي الزنوجي 😎<br>وصلت للموجة '+(G.wave+1)+' — النقاط: '+G.score; }
+  over.classList.remove('hidden');
+  tone(300,60,.5,'sawtooth',.08);
+}
+$('#startBtn').addEventListener('click', startGame);
+$('#againBtn').addEventListener('click', startGame);
+$('#menuBtn').addEventListener('click', ()=>{ over.classList.add('hidden'); game.classList.add('hidden'); intro.classList.remove('hidden'); G.state='intro'; });
+muteBtn.addEventListener('click', ()=>{ MUTE=!MUTE; muteBtn.textContent = MUTE?'🔇':'🔊'; });
+
+/* ============================================================
+   رسم الصور
+   ============================================================ */
+function drawFace(ctx, img, x, y, r, flash){
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x,y,Math.max(2,r),0,6.2832); ctx.closePath();
+  ctx.save(); ctx.clip();
+  if(img && img.complete && img.naturalWidth){
+    ctx.drawImage(img, x-r, y-r, r*2, r*2);
+  } else {
+    const gr=ctx.createRadialGradient(x-r*0.3,y-r*0.35,r*0.1,x,y,r);
+    gr.addColorStop(0,'#7c8cff'); gr.addColorStop(1,'#2a0f3d');
+    ctx.fillStyle=gr; ctx.fillRect(x-r,y-r,r*2,r*2);
+  }
+  if(flash>0){ ctx.fillStyle='rgba(255,255,255,'+Math.min(.85,flash)+')'; ctx.fillRect(x-r,y-r,r*2,r*2); }
+  ctx.restore();
+  ctx.lineWidth=Math.max(1,r*0.09); ctx.strokeStyle='rgba(0,255,210,.75)'; ctx.stroke();
+  // عيون حمراء
+  ctx.fillStyle='rgba(255,60,60,.9)';
+  const ex=r*0.3, ey=-r*0.12, er=Math.max(1.2,r*0.13);
+  ctx.beginPath(); ctx.arc(x-ex,y+ey,er,0,6.2832); ctx.arc(x+ex,y+ey,er,0,6.2832); ctx.fill();
+  ctx.restore();
+}
+function drawPlane(ctx, x, y, k, tilt){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(tilt||0); ctx.scale(k,k);
+  ctx.shadowColor='rgba(0,255,220,.9)'; ctx.shadowBlur=14;
+  ctx.fillStyle='#8ffbe4';
+  ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(7,-4); ctx.lineTo(24,12); ctx.lineTo(24,19);
+  ctx.lineTo(7,11); ctx.lineTo(6,22); ctx.lineTo(14,26); ctx.lineTo(14,30); ctx.lineTo(0,25);
+  ctx.lineTo(-14,30); ctx.lineTo(-14,26); ctx.lineTo(-6,22); ctx.lineTo(-7,11); ctx.lineTo(-24,19);
+  ctx.lineTo(-24,12); ctx.lineTo(-7,-4); ctx.closePath(); ctx.fill();
+  ctx.shadowBlur=0; ctx.fillStyle='#0b5f6b';
+  ctx.beginPath(); ctx.ellipse(0,-8,4,10,0,0,6.2832); ctx.fill();
+  ctx.restore();
 }
 
-/* ====== الضربة ====== */
-function attack(){
-  if(phase === "idle"){ spawn(0); return; }          // أول ضغطة: يظهر أول وحش داخل المكعب
-  if(phase === "dead" || phase === "done"){ next(); return; }
+/* ============================================================
+   تحديث اللعبة
+   ============================================================ */
+function update(dt){
+  G.time += dt;
+  if(G.state!=='playing') return;
+  const P=G.player, w=WAVES[G.wave];
 
-  const dmg = 20 + Math.floor(Math.random()*11);      // من 20 إلى 30
-  hp = Math.max(0, hp - dmg);
-  hpText.textContent = hp;
-  hpFill.style.width = (hp / monsters[idx].hp * 100) + "%";
-  if(hp <= 50) hpFill.classList.add("low");
-  blood(dmg);
+  if(G.shake>0) G.shake = Math.max(0, G.shake-dt*3);
+  if(G.flash>0) G.flash = Math.max(0, G.flash-dt*2.5);
 
-  if(hp <= 0) kill();
-}
+  // --- حركة الطيار (الجويستيك) ---
+  let jx = G.joy.x, jy = G.joy.y;
+  if(G.keys['arrowleft']||G.keys['a']) jx -= 1;
+  if(G.keys['arrowright']||G.keys['d']) jx += 1;
+  if(G.keys['arrowup']||G.keys['w']) jy -= 1;
+  if(G.keys['arrowdown']||G.keys['s']) jy += 1;
+  const m=Math.hypot(jx,jy); if(m>1){jx/=m; jy/=m;}
+  const SPD=340;
+  P.x += jx*SPD*dt; P.z -= jy*SPD*dt;
+  P.x = clamp(P.x, -ARENA_X+26, ARENA_X-26);
+  P.z = clamp(P.z, 18, 430);
 
-/* ====== قتل الوحش ====== */
-function kill(){
-  phase = "dead";
-  cube.classList.add("dead");
-  kills++;
-  killsEl.textContent = kills;
-  msg.textContent = "💀 لقد قتلت الوحش: " + monsters[idx].name;
-  hint.textContent = "اضغط على المكعب أو الزر للوحش التالي";
-  nextBtn.hidden = false;
-  nextBtn.textContent = "العبد التالي 👹";
-}
+  // --- إطلاق تلقائي (حركة واحدة بس) ---
+  P.cd -= dt;
+  if(P.cd<=0 && P.alive){
+    P.cd = 0.2;
+    let vx=0; const TM=G.monster;
+    if(TM && Math.abs(P.x-TM.x)<170) vx = clamp((TM.x-P.x)*1.3, -300, 300);
+    G.bullets.push({x:P.x,y:PLAYER_Y,z:P.z+18,vx:vx,vz:760,life:2.2,pr:7});
+    tone(760,420,.06,'square',.022);
+  }
 
-/* ====== الانتقال للوحش التالي ====== */
-function next(){
-  if(idx + 1 < monsters.length){ spawn(idx + 1); return; }
-  phase = "done";
-  cube.classList.remove("dead");
-  cube.classList.add("idle");
-  msg.textContent = "🏆 قتلت كل العبيد! انتهت اللعبة";
-  msg.classList.add("win");
-  hint.textContent = "لا يوجد وحوش أخر";
-  nextBtn.hidden = true;
-}
-
-/* ====== التحكم ====== */
-cube.addEventListener("click", attack);
-nextBtn.addEventListener("click", next);
-document.addEventListener("keydown", e => {
-  if(e.code === "Space" || e.code === "Enter"){ e.preventDefault(); attack(); }
-});
-</script>
-</body>
-</html>
+  // --- الوحش ---
+  const M=G.monster;
+  if(M){
+    M.t += dt;
+    if(M.hitFlash>0) M.hitFlash-=dt*4;
+    if(M.z > w.hover){ M.z = Math.max(w.hover, M.z - w.speed*dt); }
+    // اندفاع للوحش الأخير
+    if(w.pattern===4){
+      M.dashCd -= dt;
+      if(M.dashCd<=0){ M.dashCd=4.5; M.dashT=0.75; }
+      if(M.da
