@@ -1,160 +1,123 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>الولبي المتخلخل</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#001126;color:#fff;font-family:system-ui,Arial;touch-action:none}
-#game{position:relative;width:100vw;height:100dvh;overflow:hidden;background:radial-gradient(ellipse at center,#071b31 0,#001126 68%)}
-#hud{position:absolute;top:8px;left:8px;right:8px;z-index:5;display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:12px}
-.panel{background:#06182ddc;border:1px solid #537084;border-radius:7px;padding:4px 6px;box-shadow:0 0 8px #001}
-#bossbar{position:absolute;top:39px;left:27%;width:46%;height:7px;border:1px solid #d7e5f1;background:#06101c;z-index:4}
-#bossfill{height:100%;width:100%;background:#e53c69;transition:width .15s}
-#arena{position:absolute;inset:0;overflow:hidden}
-.enemy{position:absolute;width:54px;height:54px;object-fit:cover;border:1px solid #7a9fb6;box-shadow:0 0 12px #6daaff66;border-radius:3px;user-select:none}
-.enemy.boss{width:76px;height:76px;border:2px solid #ff6a85;box-shadow:0 0 18px #ff315d88}
-.minion{width:32px;height:32px;border-color:#a5bad0}
-#plane{position:absolute;z-index:3;width:30px;height:28px;left:50%;top:76%;transform:translate(-50%,-50%);font-size:0;filter:drop-shadow(0 0 5px #18dfff)} #plane:before{content:'';position:absolute;left:4px;top:0;width:22px;height:23px;border:2px solid #45eaff;border-bottom:0;border-radius:15px 15px 0 0;background:#0a8ca8} #plane:after{content:'';position:absolute;left:4px;top:10px;width:22px;height:12px;border:2px solid #45eaff;border-top:0;border-radius:0 0 4px 4px;background:#0a8ca8}
-.shot{position:absolute;width:4px;height:16px;border-radius:5px;background:#24e7ff;box-shadow:0 0 9px #24e7ff;z-index:2}
-.bullet{position:absolute;width:7px;height:13px;border-radius:4px;background:#ffb21e;box-shadow:0 0 8px #ff7a00;z-index:2}
-#stick{position:absolute;left:22px;bottom:28px;width:116px;height:116px;border-radius:50%;background:#34495bbd;border:1px solid #6e8598;z-index:8;touch-action:none}
-#knob{position:absolute;width:48px;height:48px;left:33px;top:33px;border-radius:50%;background:#f5fbff;border:3px solid #9fb5c8;box-shadow:0 2px 12px #0008}
-#hint{position:absolute;bottom:12px;right:10px;max-width:54%;font-size:11px;color:#a9c2d5;text-align:right}
-#bossintro{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:9;background:#071b30eF;border:1px solid #ff6a85;border-radius:10px;padding:9px 14px;max-width:90%;text-align:center;font-weight:800;font-size:15px;white-space:nowrap;box-shadow:0 0 18px #ff315d55;opacity:0;pointer-events:none;transition:opacity .25s}
-#bossintro.show{opacity:1}
-#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#001126dd;z-index:20;text-align:center;padding:25px}
-#dialog{max-width:330px;background:#071b30;border:1px solid #51728c;border-radius:16px;padding:22px;box-shadow:0 0 35px #00bde955}
-#dialog h1{font-size:24px;margin:0 0 8px}#dialog p{line-height:1.7;color:#c4d7e5}
-button{border:0;border-radius:10px;background:#00c8e8;color:#001126;font-weight:800;font-size:16px;padding:12px 24px}
-#sound{position:absolute;right:12px;top:76px;z-index:7;border-radius:50%;width:44px;height:44px;padding:0;background:#253d51cc;color:white;border:1px solid #7890a3}
-@media(min-width:700px){#game{max-width:430px;margin:auto;border-left:1px solid #345}body{background:#000}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#081a2b">
+  <meta name="description" content="منصة تفاعلية لشرح العلوم المتكاملة للصف الأول الثانوي: الأنظمة البيئية المائية والغلاف الجوي.">
+  <title>مختبر العلوم | العلوم المتكاملة</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="game">
- <div id="hud">
-  <div class="panel">المرحلة <b id="level">1</b>/5</div>
-  <div class="panel">HP: <b id="hp">100</b></div>
-  <div class="panel" id="enemyname">الولبي المتخلخل</div>
- </div>
- <div id="bossbar"><div id="bossfill"></div></div>
- <button id="sound" aria-label="الصوت">♫</button>
- <div id="bossintro"></div>
- <div id="arena">
-  <div id="plane"></div><img id="allyplane" alt="الملتهم الأحمق - مساعد" style="display:none;position:absolute;z-index:3;width:38px;height:38px;object-fit:cover;border:2px solid #ffb44d;border-radius:4px;box-shadow:0 0 10px #ff9c32">
- </div>
- <div id="stick"><div id="knob"></div></div>
- <div id="hint">حرّك عصا التحكم لتفادي الطلقات — إطلاق النار تلقائي</div>
- <div id="overlay"><div id="dialog"><h1>الطائرة ضد الوحوش</h1><p>قاتل الوحوش الخمسة، تفادَ الطلقات وحرّك الطائرة بعصا التحكم. إطلاق النار تلقائي.</p><button id="start">ابدأ اللعب</button></div></div>
-</div>
-<script>
-(()=>{
-const arena=document.getElementById('arena'),plane=document.getElementById('plane'),stick=document.getElementById('stick'),knob=document.getElementById('knob');
-const hpEl=document.getElementById('hp'),levelEl=document.getElementById('level'),nameEl=document.getElementById('enemyname'),bar=document.getElementById('bossfill'),overlay=document.getElementById('overlay'),intro=document.getElementById('bossintro'),allyPlane=document.getElementById('allyplane');
-const bosses=[
- {name:'الولبي المتخلخل',img:'https://i.ibb.co/kg8KTv5J/IMG20260928122647.jpg',hp:18,minions:3,rate:1000,pattern:'single'},
- {name:'القزم الأسود',img:'https://i.ibb.co/MkSFHKRn/IMG20260927105029.jpg',hp:26,minions:5,rate:850,pattern:'spread'},
- {name:'الملتهم الأحمق',img:'https://i.ibb.co/8nrqvqby/IMG20261004083141.jpg',hp:34,minions:7,rate:700,pattern:'aimed'},
- {name:'الأبيض الشرس',img:'https://i.ibb.co/tpVdhmXd/IMG20260927105042.jpg',hp:44,minions:9,rate:590,pattern:'burst'},
- {name:'المجهول المقرف الأبيض الكريه',img:'https://i.ibb.co/tPXL0GkJ/IMG20260927105217.jpg',hp:68,minions:12,rate:380,pattern:'final'}
-];
-let W,H,px=.5,py=.76,dx=0,dy=0,playing=false,hp=100,stage=0,boss=null,enemies=[],shots=[],bullets=[],lastShot=0,lastEnemyShot=0,lastTime=0,raf=0,soundOn=true,audioCtx=null,ally=null,allyShots=[],lastAllyShot=0,planeBoost=false;
-function tone(freq=440,duration=.07,type='square',volume=.025,slide=0){
- if(!soundOn)return;
- try{
-  audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-  if(audioCtx.state==='suspended')audioCtx.resume();
-  const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,audioCtx.currentTime);
-  if(slide)o.frequency.linearRampToValueAtTime(Math.max(50,freq+slide),audioCtx.currentTime+duration);
-  g.gain.setValueAtTime(volume,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration);
-  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+duration);
- }catch(e){}
-}
-function sfxShoot(){tone(700,.045,'square',.018,-220)}
-function sfxHit(){tone(170,.09,'sawtooth',.035,-80)}
-function sfxEnemy(){tone(260,.10,'triangle',.025,-110)}
-function sfxAlly(){tone(520,.07,'square',.022,-150)}
-function size(){W=arena.clientWidth;H=arena.clientHeight;px=Math.min(1,Math.max(0,px));py=Math.min(1,Math.max(0,py))}
-window.addEventListener('resize',size);size();
-function el(tag,cls){let n=document.createElement(tag);if(cls)n.className=cls;arena.appendChild(n);return n}
-function spawnEnemy(isBoss=false){
- const spec=bosses[stage],node=el('img','enemy'+(isBoss?' boss':' minion'));node.src=spec.img;node.alt=spec.name;
- const e={node,x:isBoss?W*.5:Math.random()*(W-40)+20,y:isBoss?H*.17:Math.random()*H*.35+H*.08,isBoss,hp:isBoss?spec.hp:2,max:isBoss?spec.hp:2,phase:Math.random()*7};
- enemies.push(e);return e
-}
-function announceBoss(name){
- intro.textContent='⚠ البوص: '+name+' ⚠';intro.classList.add('show');
- setTimeout(()=>intro.classList.remove('show'),2300);
-}
-function startStage(){
- enemies.forEach(e=>e.node.remove());enemies=[];shots.forEach(x=>x.node.remove());shots=[];bullets.forEach(x=>x.node.remove());bullets=[];
- allyShots.forEach(x=>x.node.remove());allyShots=[];ally=null;planeBoost=stage===4;
- plane.style.transform='translate(-50%,-50%) scale(1)';
- allyPlane.style.display='block';allyPlane.src=bosses[2].img;
- boss=spawnEnemy(true);for(let i=0;i<bosses[stage].minions;i++)spawnEnemy(false);
- ally={x:W*.30,y:H*.73};intro.textContent='الملتهم الأحمق انضم إليك!';
- nameEl.textContent=bosses[stage].name;levelEl.textContent=stage+1;bar.style.width='100%';lastEnemyShot=performance.now()+450;announceBoss(bosses[stage].name);
-}
-function shootPlayer(t){if(t-lastShot<190)return;lastShot=t;const s=el('div','shot');s.style.left=(px*W-2)+'px';s.style.top=(py*H-28)+'px';shots.push({node:s,x:px*W,y:py*H-28});sfxShoot()}
-function shootEnemy(e,angleOffset=0,speed=2.5){
- const b=el('div','bullet');b.style.left=e.x+'px';b.style.top=(e.y+24)+'px';
- let tx=px*W,ty=py*H,dx=tx-e.x,dy=ty-e.y,a=Math.atan2(dy,dx)+angleOffset;
- bullets.push({node:b,x:e.x,y:e.y+24,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed});sfxEnemy()
-}
-function bossAttack(t){
- const spec=bosses[stage],living=enemies.filter(e=>!e.isBoss);
- living.forEach((e,i)=>{if(t-(e.lastShot||0)>spec.rate*(stage<2?2.0:1.45)+i*75){shootEnemy(e,0,1.8+stage*.18);e.lastShot=t}});
- if(t-lastEnemyShot<spec.rate)return;
- lastEnemyShot=t;
- if(stage===0){shootEnemy(boss,0,2.1)}
- else if(stage===1){[-.24,0,.24].forEach(a=>shootEnemy(boss,a,2.3))}
- else if(stage===2){shootEnemy(boss,0,2.7);shootEnemy(boss,-.18,2.3);shootEnemy(boss,.18,2.3)}
- else if(stage===3){for(let i=-2;i<=2;i++)shootEnemy(boss,i*.17,2.7);living.forEach((e,i)=>{if(i%2===0)shootEnemy(e,0,2.2)})}
- else {
-   const mode=Math.floor(t/1700)%4;
-   if(mode===0){for(let i=-3;i<=3;i++)shootEnemy(boss,i*.14,3.0)}
-   else if(mode===1){for(let i=0;i<12;i++)shootEnemy(boss,i*Math.PI/6,2.5)}
-   else if(mode===2){for(let i=-2;i<=2;i++)shootEnemy(boss,i*.10,3.3);living.forEach(e=>shootEnemy(e,0,2.8))}
-   else {for(let i=0;i<8;i++)shootEnemy(boss,i*Math.PI/4+ t*.001,2.8)}
- }
-}
-function end(msg,title){playing=false;overlay.style.display='flex';document.getElementById('dialog').innerHTML='<h1>'+title+'</h1><p>'+msg+'</p><button id="again">العب مرة أخرى</button>';document.getElementById('again').onclick=reset}
-function reset(){hp=100;stage=0;px=.5;py=.76;hpEl.textContent=hp;overlay.style.display='none';playing=true;startStage();lastTime=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
-function loop(t){
- if(!playing)return;let dt=Math.min(32,t-(lastTime||t));lastTime=t;
- if(ally){
-  ally.x=W*.30+Math.sin(t*.0015)*W*.09;ally.y=H*.73+Math.sin(t*.002)*14;
-  allyPlane.style.left=ally.x+'px';allyPlane.style.top=ally.y+'px';allyPlane.style.transform='translate(-50%,-50%)';
-  if(t-lastAllyShot>Math.max(150,360-stage*45)){lastAllyShot=t;const s=el('div','shot');s.style.background='#ffb44d';s.style.boxShadow='0 0 10px #ff9c32';s.style.left=ally.x+'px';s.style.top=(ally.y-24)+'px';allyShots.push({node:s,x:ally.x,y:ally.y-24});sfxAlly()}
- }
- px=Math.max(.06,Math.min(.94,px+dx*dt*.00048));py=Math.max(.12,Math.min(.91,py+dy*dt*.00048));
- plane.style.left=(px*W)+'px';plane.style.top=(py*H)+'px';shootPlayer(t);
- enemies.forEach(e=>{
-  if(e.isBoss){e.x=W*.5+Math.sin(t*(stage===4?.0018:.001))*W*(stage===4?.34:.27);e.y=H*.15+Math.sin(t*(stage===4?.003:.0017))* (stage===4?24:12)}
-  else {e.x+=Math.sin(t*.0015+e.phase)*.7;e.y+=Math.sin(t*.001+e.phase)*.25}
-  e.node.style.left=(e.x-(e.isBoss?38:16))+'px';e.node.style.top=(e.y-(e.isBoss?38:16))+'px';
- });
- bossAttack(t)
- shots.forEach(s=>{s.y-=7;s.node.style.top=s.y+'px';for(let i=enemies.length-1;i>=0;i--){let e=enemies[i];if(Math.abs(s.x-e.x)<(e.isBoss?39:20)&&Math.abs(s.y-e.y)<(e.isBoss?40:23)){e.hp--;s.y=-100;if(e.hp<=0){e.node.remove();enemies.splice(i,1);if(e.isBoss){stage++;if(stage>=bosses.length){end('لقد هزمت جميع الوحوش وأنقذت الطائرة!','انتصار!');return}else{startStage();return}}}break}}});
- shots=shots.filter(s=>{if(s.y<-25){s.node.remove();return false}return true});
- allyShots.forEach(s=>{s.y-=8;s.node.style.top=s.y+'px';for(let i=enemies.length-1;i>=0;i--){let e=enemies[i];if(Math.abs(s.x-e.x)<(e.isBoss?43:20)&&Math.abs(s.y-e.y)<(e.isBoss?42:22)){e.hp-=2;s.y=-100;if(e.hp<=0){e.node.remove();enemies.splice(i,1);if(e.isBoss){stage++;if(stage>=bosses.length){end('أنت والملتهم الأحمق هزمتما البوص الأخير معًا!','انتصار مشترك!');return}else{startStage();return}}}break}}});
- allyShots=allyShots.filter(s=>{if(s.y<-25){s.node.remove();return false}return true});
- bullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;b.node.style.left=b.x+'px';b.node.style.top=b.y+'px';if(Math.hypot(b.x-px*W,b.y-py*H)<23){hp-=1;b.y=H+99;hpEl.textContent=hp}});
- bullets=bullets.filter(b=>{if(b.y>H+20||b.x<0||b.x>W){b.node.remove();return false}return true});
- bar.style.width=(boss?Math.max(0,boss.hp/boss.max*100):100)+'%';
- if(hp<=0){end('لقد هُزمت الطائرة. جرّب مرة أخرى وتفادَ الطلقات.','انتهت اللعبة');return}
- raf=requestAnimationFrame(loop)
-}
-let active=false,originX=0,originY=0;
-function pointerDown(e){active=true;stick.setPointerCapture?.(e.pointerId);let r=stick.getBoundingClientRect();originX=r.left+r.width/2;originY=r.top+r.height/2;moveStick(e)}
-function moveStick(e){if(!active)return;let x=e.clientX-originX,y=e.clientY-originY,len=Math.hypot(x,y),max=34;if(len>max){x=x/len*max;y=y/len*max}knob.style.left=(33+x)+'px';knob.style.top=(33+y)+'px';dx=x/max;dy=y/max}
-function pointerUp(){active=false;dx=dy=0;knob.style.left='33px';knob.style.top='33px'}
-stick.addEventListener('pointerdown',pointerDown);stick.addEventListener('pointermove',moveStick);stick.addEventListener('pointerup',pointerUp);stick.addEventListener('pointercancel',pointerUp);
-document.getElementById('start').onclick=reset;
-document.getElementById('sound').onclick=()=>{soundOn=!soundOn;document.getElementById('sound').textContent=soundOn?'♫':'♪';if(soundOn)tone(600,.08,'sine',.02)};
-})();
-</script>
-</div>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><span>H₂O</span><i></i></div>
+        <div><strong>مختبر العلوم</strong><small>INTEGRATED SCIENCE</small></div>
+      </div>
+      <div class="profile-mini">
+        <div class="avatar">✦</div>
+        <div><strong>رحلتك العلمية</strong><small>أولى ثانوي • الترم الأول</small></div>
+      </div>
+      <nav class="side-nav" aria-label="القائمة الرئيسية">
+        <button class="nav-item active" data-view="learn"><span class="nav-icon">▤</span><span>المحتوى التعليمي</span><kbd>01</kbd></button>
+        <button class="nav-item" data-view="lab"><span class="nav-icon">⚗</span><span>المعمل التفاعلي</span><kbd>02</kbd></button>
+        <button class="nav-item" data-view="quiz"><span class="nav-icon">✎</span><span>مركز الاختبارات</span><kbd>03</kbd></button>
+        <button class="nav-item" data-view="glossary"><span class="nav-icon">Aa</span><span>قاموس المصطلحات</span><kbd>04</kbd></button>
+        <button class="nav-item" data-view="map"><span class="nav-icon">⌘</span><span>خريطة المنهج</span><kbd>05</kbd></button>
+      </nav>
+      <div class="sidebar-divider"></div>
+      <div class="side-heading"><span>دروس المنهج</span><span class="tiny-count">14 درس</span></div>
+      <div class="lesson-nav" id="lesson-nav"></div>
+      <div class="sidebar-bottom">
+        <div class="progress-mini"><div class="progress-ring" id="sidebar-ring"><span id="sidebar-percent">0%</span></div><div><strong>تقدمك في المنهج</strong><small id="sidebar-progress-label">ابدأ أول درس</small></div></div>
+        <button class="clear-progress" id="reset-progress">إعادة ضبط التقدم</button>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button class="mobile-menu icon-button" id="mobile-menu" aria-label="فتح القائمة">☰</button>
+        <div class="breadcrumb"><span>الصف الأول الثانوي</span><b>/</b><strong id="crumb-current">المحتوى التعليمي</strong></div>
+        <div class="top-actions">
+          <label class="search-box"><span>⌕</span><input id="global-search" type="search" placeholder="ابحث عن درس أو مصطلح..." autocomplete="off"><kbd>⌘ K</kbd></label>
+          <button class="icon-button" id="theme-toggle" title="تغيير المظهر" aria-label="تغيير المظهر">☼</button>
+        </div>
+      </header>
+
+      <section class="welcome-strip" id="welcome-strip">
+        <div class="welcome-copy">
+          <div class="eyebrow"><span class="live-dot"></span> منصة تفاعلية • منهج 2026–2027</div>
+          <h1>افهم العلوم، <em>مش بس احفظها.</em></h1>
+          <p>رحلة من جزيء الماء إلى طبقات الغلاف الجوي — شروحات، رسومات، محاكاة وتجارب آمنة.</p>
+          <div class="welcome-actions"><button class="primary-btn" id="continue-learning">ابدأ رحلة التعلم <span>←</span></button><button class="quiet-btn" data-jump="lab">افتح المعمل <span>⚗</span></button></div>
+        </div>
+        <div class="welcome-art" aria-label="رسم توضيحي للأرض والماء والغلاف الجوي">
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+          <div class="planet"><div class="planet-shine"></div><span class="land land-one"></span><span class="land land-two"></span><span class="land land-three"></span></div>
+          <div class="float-label label-water">H₂O <small>الماء</small></div><div class="float-label label-air">N₂ · O₂ <small>الهواء</small></div><div class="spark spark-one">✦</div><div class="spark spark-two">+</div>
+        </div>
+        <div class="welcome-foot"><span>01</span><span>منهج العلوم المتكاملة</span><span class="foot-line"></span><span>14 درسًا</span></div>
+      </section>
+
+      <section class="stats-row" id="stats-row">
+        <article class="stat-card"><div class="stat-icon aqua">▤</div><div><small>إجمالي الدروس</small><strong>14 <span>درس</span></strong></div><div class="stat-side">10 + 4</div></article>
+        <article class="stat-card"><div class="stat-icon violet">⚗</div><div><small>محاكاة وتجارب</small><strong id="stat-labs">9 <span>أنشطة</span></strong></div><div class="stat-side">تفاعلية</div></article>
+        <article class="stat-card"><div class="stat-icon amber">✎</div><div><small>أسئلة تدريبية</small><strong id="stat-questions">42 <span>سؤالًا</span></strong></div><div class="stat-side">مع تصحيح فوري</div></article>
+        <article class="stat-card"><div class="stat-icon green">◉</div><div><small>إنجازك</small><strong id="stat-progress">0<span>%</span></strong></div><div class="stat-side">محفوظ على جهازك</div></article>
+      </section>
+
+      <div id="view-learn" class="view-panel active">
+        <div class="section-heading">
+          <div><div class="eyebrow muted">YOUR LEARNING PATH</div><h2>المحتوى التعليمي</h2><p>اختار درسًا، اقرأ الفكرة، جرّب بنفسك، وبعدها اختبر فهمك.</p></div>
+          <div class="heading-tools"><span class="small-chip"><i></i> شرح بالعربي + English</span><button class="outline-btn" id="open-map">عرض خريطة المنهج ↗</button></div>
+        </div>
+        <div class="lesson-layout">
+          <article class="lesson-panel" id="lesson-content" aria-live="polite"></article>
+          <aside class="lesson-aside">
+            <div class="aside-card lesson-progress-card"><div class="aside-title"><span>تقدم الدرس</span><b id="lesson-progress-value">0%</b></div><div class="bar-track"><i id="lesson-progress-bar"></i></div><p id="lesson-progress-text">علّم الدرس كمكتمل بعد المذاكرة.</p><button class="complete-btn" id="complete-lesson">✓ علّمت الدرس كمكتمل</button></div>
+            <div class="aside-card"><div class="aside-title"><span>مفاتيح الدرس</span><span class="sparkle">✦</span></div><div id="lesson-keywords" class="keyword-list"></div></div>
+            <div class="aside-card tip-card"><div class="tip-symbol">✧</div><strong>نصيحة للمذاكرة</strong><p id="study-tip">اربط كل مصطلح بمثال من الحياة اليومية؛ الفهم يثبت أكثر من الحفظ المنفصل.</p></div>
+            <div class="aside-card quick-links"><div class="aside-title"><span>انتقل بسرعة</span></div><button data-jump="lab">⚗ المعمل التفاعلي <span>←</span></button><button data-jump="quiz">✎ اختبر نفسك <span>←</span></button><button data-jump="glossary">Aa قاموس المصطلحات <span>←</span></button></div>
+          </aside>
+        </div>
+      </div>
+
+      <section id="view-lab" class="view-panel">
+        <div class="section-heading"><div><div class="eyebrow muted">VIRTUAL SCIENCE LAB</div><h2>المعمل التفاعلي</h2><p>غيّر المتغيرات وشاهد كيف تتغير النتيجة. كل محاكاة معها تفسير علمي.</p></div><span class="small-chip"><i></i> جرّب بنفسك</span></div>
+        <div class="lab-tabs" id="lab-tabs"></div>
+        <div class="lab-stage" id="lab-stage"></div>
+        <div class="experiment-library"><div class="subheading"><div><h3>تجارب منزلية آمنة</h3><p>أنشطة بسيطة باستخدام أدوات يومية، بدون لهب أو مواد خطرة.</p></div><span class="safe-tag">✦ SAFE LAB</span></div><div class="experiment-grid" id="experiment-grid"></div></div>
+      </section>
+
+      <section id="view-quiz" class="view-panel">
+        <div class="section-heading"><div><div class="eyebrow muted">CHECK YOUR UNDERSTANDING</div><h2>مركز الاختبارات</h2><p>أسئلة متنوعة من الدروس الـ14 مع تفسير الإجابة بعد الاختيار.</p></div><span class="small-chip">تدريب بدون درجات نهائية</span></div>
+        <div class="quiz-toolbar"><label>اختر الدرس <select id="quiz-lesson-select"><option value="all">كل المنهج</option></select></label><span id="quiz-count">42 سؤالًا</span><button class="outline-btn" id="shuffle-quiz">خلط الأسئلة ↻</button></div>
+        <div id="quiz-area" class="quiz-list"></div>
+      </section>
+
+      <section id="view-glossary" class="view-panel">
+        <div class="section-heading"><div><div class="eyebrow muted">SCIENCE DICTIONARY</div><h2>قاموس المصطلحات</h2><p>ابحث عن المصطلح الإنجليزي أو العربي، واضغط عليه لعرض تعريفه ومثال عليه.</p></div><span class="small-chip" id="glossary-count">0 مصطلح</span></div>
+        <div class="glossary-search"><span>⌕</span><input type="search" id="glossary-search" placeholder="مثال: Polarity أو القطبية..."></div>
+        <div class="glossary-grid" id="glossary-grid"></div>
+      </section>
+
+      <section id="view-map" class="view-panel">
+        <div class="section-heading"><div><div class="eyebrow muted">THE COMPLETE SYLLABUS</div><h2>خريطة المنهج</h2><p>14 درسًا مرتبة وفق وحدتي الترم الأول.</p></div><span class="small-chip">2026–2027</span></div>
+        <div class="map-summary"><div><b>01</b><span>النظام البيئي المائي</span><small>10 دروس</small></div><div class="map-summary-line"></div><div><b>02</b><span>الغلاف الجوي</span><small>4 دروس</small></div></div>
+        <div id="curriculum-map" class="curriculum-map"></div>
+        <div class="sources-note"><div class="sources-icon">⌑</div><div><strong>عن المحتوى والمراجع</strong><p>الشرح هنا مكتوب بصياغة تعليمية أصلية اعتمادًا على عناوين المنهج والمفاهيم العلمية الأساسية، وليس نسخًا من كتاب خارجي. راجع أحدث نسخة من كتاب الوزارة للتأكد من أي تحديثات أو تفاصيل مطلوبة في مدرستك.</p><a href="https://ellibrary.moe.gov.eg/Books-sec/" target="_blank" rel="noopener">مكتبة وزارة التربية والتعليم ↗</a><span>ترتيب الدروس: كتاب العلوم المتكاملة، الصف الأول الثانوي، الترم الأول 2026–2027.</span></div></div>
+      </section>
+
+      <footer class="site-footer"><span>مختبر العلوم <b>•</b> تعلّم بالفهم والتجربة</span><span>صُنع للتعلّم — لا يحتاج إلى حساب أو تسجيل دخول</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <dialog id="term-dialog" class="term-dialog"><button class="dialog-close" id="dialog-close" aria-label="إغلاق">×</button><div class="dialog-kicker">SCIENCE TERM</div><h3 id="dialog-term"></h3><p class="dialog-ar" id="dialog-ar"></p><p id="dialog-desc"></p><div class="dialog-example" id="dialog-example"></div></dialog>
+  <script src="lessons.js"></script>
+  <script src="experiments.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
