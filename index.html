@@ -3,119 +3,132 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#081a2b">
-  <meta name="description" content="منصة تفاعلية لشرح العلوم المتكاملة للصف الأول الثانوي: الأنظمة البيئية المائية والغلاف الجوي.">
-  <title>مختبر العلوم | العلوم المتكاملة</title>
+  <meta name="theme-color" content="#071b2a">
+  <meta name="description" content="منصة مختبر العلوم التفاعلية لشرح منهج العلوم المتكاملة للصف الأول الثانوي — الترم الأول 2026–2027.">
+  <title>أكاديمية العلوم | مختبر العلوم المتكاملة</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='85'%3E%F0%9F%A7%AA%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="ambient ambient-a"></div>
-  <div class="ambient ambient-b"></div>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <div class="brand">
-        <div class="brand-mark"><span>H₂O</span><i></i></div>
-        <div><strong>مختبر العلوم</strong><small>INTEGRATED SCIENCE</small></div>
+      <div class="brand-lockup">
+        <div class="brand-symbol"><span>H₂O</span><i></i></div>
+        <div class="brand-name"><strong>أكاديمية العلوم</strong><small>SCIENCE EXPLORER</small></div>
       </div>
-      <div class="profile-mini">
-        <div class="avatar">✦</div>
+      <div class="student-card">
+        <div class="student-avatar">✦</div>
         <div><strong>رحلتك العلمية</strong><small>أولى ثانوي • الترم الأول</small></div>
+        <span class="offline-dot" title="يعمل بدون حساب"></span>
       </div>
-      <nav class="side-nav" aria-label="القائمة الرئيسية">
-        <button class="nav-item active" data-view="learn"><span class="nav-icon">▤</span><span>المحتوى التعليمي</span><kbd>01</kbd></button>
-        <button class="nav-item" data-view="lab"><span class="nav-icon">⚗</span><span>المعمل التفاعلي</span><kbd>02</kbd></button>
-        <button class="nav-item" data-view="quiz"><span class="nav-icon">✎</span><span>مركز الاختبارات</span><kbd>03</kbd></button>
-        <button class="nav-item" data-view="glossary"><span class="nav-icon">Aa</span><span>قاموس المصطلحات</span><kbd>04</kbd></button>
-        <button class="nav-item" data-view="map"><span class="nav-icon">⌘</span><span>خريطة المنهج</span><kbd>05</kbd></button>
+      <div class="nav-caption">مساحة التعلم</div>
+      <nav class="main-nav" aria-label="القائمة الرئيسية">
+        <button class="nav-button active" data-view="home"><span class="nav-glyph">⌂</span><span>الرئيسية</span></button>
+        <button class="nav-button" data-view="lessons"><span class="nav-glyph">▤</span><span>شرح الدروس</span><b>14</b></button>
+        <button class="nav-button" data-view="lab"><span class="nav-glyph">⚗</span><span>المعمل الافتراضي</span><b id="nav-labs-count">25</b></button>
+        <button class="nav-button" data-view="quiz"><span class="nav-glyph">✎</span><span>بنك الأسئلة</span></button>
+        <button class="nav-button" data-view="glossary"><span class="nav-glyph">Aa</span><span>قاموس المصطلحات</span></button>
+        <button class="nav-button" data-view="map"><span class="nav-glyph">⌘</span><span>خريطة المنهج</span></button>
       </nav>
-      <div class="sidebar-divider"></div>
-      <div class="side-heading"><span>دروس المنهج</span><span class="tiny-count">14 درس</span></div>
-      <div class="lesson-nav" id="lesson-nav"></div>
+      <div class="nav-caption lesson-caption"><span>فهرس الدروس</span><span class="caption-count">14 درسًا</span></div>
+      <div class="lesson-tree" id="lesson-tree"></div>
       <div class="sidebar-bottom">
-        <div class="progress-mini"><div class="progress-ring" id="sidebar-ring"><span id="sidebar-percent">0%</span></div><div><strong>تقدمك في المنهج</strong><small id="sidebar-progress-label">ابدأ أول درس</small></div></div>
-        <button class="clear-progress" id="reset-progress">إعادة ضبط التقدم</button>
+        <div class="sidebar-progress-head"><span>تقدمك في المنهج</span><b id="sidebar-percent">0%</b></div>
+        <div class="progress-track"><i id="sidebar-progress-bar"></i></div>
+        <small id="sidebar-progress-text">ابدأ أول درس لتسجيل تقدمك</small>
+        <button class="reset-progress" id="reset-progress">إعادة ضبط التقدم</button>
       </div>
     </aside>
 
     <main class="main-area">
       <header class="topbar">
-        <button class="mobile-menu icon-button" id="mobile-menu" aria-label="فتح القائمة">☰</button>
-        <div class="breadcrumb"><span>الصف الأول الثانوي</span><b>/</b><strong id="crumb-current">المحتوى التعليمي</strong></div>
-        <div class="top-actions">
-          <label class="search-box"><span>⌕</span><input id="global-search" type="search" placeholder="ابحث عن درس أو مصطلح..." autocomplete="off"><kbd>⌘ K</kbd></label>
-          <button class="icon-button" id="theme-toggle" title="تغيير المظهر" aria-label="تغيير المظهر">☼</button>
+        <button class="mobile-menu icon-btn" id="mobile-menu" aria-label="فتح القائمة">☰</button>
+        <div class="breadcrumb"><span>العلوم المتكاملة</span><b>/</b><strong id="breadcrumb-current">الرئيسية</strong></div>
+        <div class="topbar-actions">
+          <label class="global-search"><span>⌕</span><input id="global-search" type="search" placeholder="ابحث في الدروس والمصطلحات..." autocomplete="off"><kbd>Ctrl K</kbd></label>
+          <button class="icon-btn theme-btn" id="theme-toggle" title="تغيير الألوان" aria-label="تغيير الألوان">☼</button>
         </div>
       </header>
 
-      <section class="welcome-strip" id="welcome-strip">
-        <div class="welcome-copy">
-          <div class="eyebrow"><span class="live-dot"></span> منصة تفاعلية • منهج 2026–2027</div>
-          <h1>افهم العلوم، <em>مش بس احفظها.</em></h1>
-          <p>رحلة من جزيء الماء إلى طبقات الغلاف الجوي — شروحات، رسومات، محاكاة وتجارب آمنة.</p>
-          <div class="welcome-actions"><button class="primary-btn" id="continue-learning">ابدأ رحلة التعلم <span>←</span></button><button class="quiet-btn" data-jump="lab">افتح المعمل <span>⚗</span></button></div>
+      <section class="view active" id="view-home">
+        <div class="hero-card">
+          <div class="hero-copy">
+            <div class="eyebrow"><i></i> منهج 2026–2027 • الفصل الدراسي الأول</div>
+            <h1>العلم مش حفظ…<br><em>العلم إنك تشوف وتفهم.</em></h1>
+            <p>من قطرة الماء إلى الغلاف الجوي؛ افهم كل فكرة برسوم متحركة، وشاهد التفاعلات والمحاكاة بنفسك، وبعدها اختبر فهمك.</p>
+            <div class="hero-buttons"><button class="btn-primary" id="start-learning">ابدأ من الدرس الأول <span>←</span></button><button class="btn-secondary" data-view="lab">ادخل المعمل <span>⚗</span></button></div>
+            <div class="hero-foot"><span>14 درسًا</span><i></i><span>25 محاكاة مرئية</span><i></i><span>بدون تسجيل دخول</span></div>
+          </div>
+          <div class="hero-scene" aria-label="رسم لكوكب الأرض والغلاف الجوي">
+            <div class="scene-orbit orbit-a"></div><div class="scene-orbit orbit-b"></div>
+            <div class="planet-earth"><span class="continent continent-a"></span><span class="continent continent-b"></span><span class="continent continent-c"></span><i class="earth-glow"></i></div>
+            <div class="scene-moon">✦</div><div class="scene-label label-h2o">H₂O <small>Water</small></div><div class="scene-label label-air">N₂ · O₂ <small>Atmosphere</small></div>
+            <div class="scene-particle p-one">✧</div><div class="scene-particle p-two">+</div><div class="scene-particle p-three">·</div>
+          </div>
         </div>
-        <div class="welcome-art" aria-label="رسم توضيحي للأرض والماء والغلاف الجوي">
-          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
-          <div class="planet"><div class="planet-shine"></div><span class="land land-one"></span><span class="land land-two"></span><span class="land land-three"></span></div>
-          <div class="float-label label-water">H₂O <small>الماء</small></div><div class="float-label label-air">N₂ · O₂ <small>الهواء</small></div><div class="spark spark-one">✦</div><div class="spark spark-two">+</div>
+
+        <div class="stats-grid">
+          <article class="stat-tile"><span class="stat-icon cyan">▤</span><div><small>دروس المنهج</small><strong>14 <i>درس</i></strong></div><b>10 + 4</b></article>
+          <article class="stat-tile"><span class="stat-icon purple">⚗</span><div><small>المعمل الافتراضي</small><strong id="stat-labs">25 <i>محاكاة</i></strong></div><b>مرئي وتفاعلي</b></article>
+          <article class="stat-tile"><span class="stat-icon orange">✎</span><div><small>بنك الأسئلة</small><strong id="stat-questions">234 <i>سؤال</i></strong></div><b>بالتفسير</b></article>
+          <article class="stat-tile"><span class="stat-icon green">◉</span><div><small>إنجازك</small><strong id="stat-progress">0<i>%</i></strong></div><b>محفوظ محليًا</b></article>
         </div>
-        <div class="welcome-foot"><span>01</span><span>منهج العلوم المتكاملة</span><span class="foot-line"></span><span>14 درسًا</span></div>
+
+        <div class="home-section-head"><div><div class="section-overline">YOUR LEARNING PATH</div><h2>ابدأ رحلتك من هنا</h2><p>المحتوى مرتب حسب وحدات الكتاب المدرسي.</p></div><button class="text-link" data-view="map">عرض خريطة المنهج ←</button></div>
+        <div class="unit-cards">
+          <article class="unit-card unit-water"><div class="unit-art"><span>H₂O</span><i class="bubble b1"></i><i class="bubble b2"></i><i class="bubble b3"></i></div><div class="unit-card-copy"><span class="unit-number">UNIT 01</span><h3>النظام البيئي المائي</h3><p>Aquatic Ecosystems</p><div class="unit-meta"><b>10 دروس</b><span>الماء • الخلايا • الكائنات • التوازن</span></div><button data-unit="1">استكشف الوحدة <span>←</span></button></div></article>
+          <article class="unit-card unit-atmosphere"><div class="unit-art"><span>ATM</span><i class="cloud cloud-a"></i><i class="cloud cloud-b"></i><i class="sun-disc"></i></div><div class="unit-card-copy"><span class="unit-number">UNIT 02</span><h3>الغلاف الجوي</h3><p>The Atmosphere</p><div class="unit-meta"><b>4 دروس</b><span>الغازات • الأوزون • الطقس • الاستدامة</span></div><button data-unit="2">استكشف الوحدة <span>←</span></button></div></article>
+        </div>
+
+        <div class="home-section-head"><div><div class="section-overline">VIRTUAL SCIENCE LAB</div><h2>شاهد العلم بعينك</h2><p>مش تجارب منزلية؛ دي محاكاة داخل الموقع تقدر تحركها وتغير متغيراتها.</p></div><button class="text-link" data-view="lab">كل المحاكيات ←</button></div>
+        <div class="featured-labs" id="featured-labs"></div>
+        <div class="study-note"><div class="note-icon">✦</div><div><strong>طريقة المذاكرة هنا</strong><p>اقرأ الفكرة، شاهد الرسم، غيّر متغيرًا في المعمل، ثم حل الأسئلة. كل مصطلح إنجليزي مهم قابل للضغط لفتح معناه بالعربي.</p></div></div>
       </section>
 
-      <section class="stats-row" id="stats-row">
-        <article class="stat-card"><div class="stat-icon aqua">▤</div><div><small>إجمالي الدروس</small><strong>14 <span>درس</span></strong></div><div class="stat-side">10 + 4</div></article>
-        <article class="stat-card"><div class="stat-icon violet">⚗</div><div><small>محاكاة وتجارب</small><strong id="stat-labs">9 <span>أنشطة</span></strong></div><div class="stat-side">تفاعلية</div></article>
-        <article class="stat-card"><div class="stat-icon amber">✎</div><div><small>أسئلة تدريبية</small><strong id="stat-questions">42 <span>سؤالًا</span></strong></div><div class="stat-side">مع تصحيح فوري</div></article>
-        <article class="stat-card"><div class="stat-icon green">◉</div><div><small>إنجازك</small><strong id="stat-progress">0<span>%</span></strong></div><div class="stat-side">محفوظ على جهازك</div></article>
+      <section class="view" id="view-lessons">
+        <div class="page-heading"><div><div class="section-overline">LESSON LIBRARY</div><h1>شرح الدروس بالتفصيل</h1><p>شرح منظم من الصفر: الفكرة، لماذا تحدث، مثال، رسم توضيحي، ثم أسئلة تثبت الفهم.</p></div><div class="page-heading-side"><span class="soft-pill">الترم الأول 2026–2027</span><span class="soft-pill">عربي + English</span></div></div>
+        <div class="lesson-browser" id="lesson-browser"></div>
+        <article class="lesson-reader" id="lesson-reader"></article>
       </section>
 
-      <div id="view-learn" class="view-panel active">
-        <div class="section-heading">
-          <div><div class="eyebrow muted">YOUR LEARNING PATH</div><h2>المحتوى التعليمي</h2><p>اختار درسًا، اقرأ الفكرة، جرّب بنفسك، وبعدها اختبر فهمك.</p></div>
-          <div class="heading-tools"><span class="small-chip"><i></i> شرح بالعربي + English</span><button class="outline-btn" id="open-map">عرض خريطة المنهج ↗</button></div>
+      <section class="view" id="view-lab">
+        <div class="page-heading"><div><div class="section-overline">INTERACTIVE SCIENCE LAB</div><h1>المعمل الافتراضي</h1><p>غيّر درجة الحرارة أو العمق أو التركيز وشاهد النتيجة فورًا. كل نموذج يشرح علاقته بالمنهج.</p></div><span class="soft-pill live-pill"><i></i> المحاكاة تعمل مباشرة</span></div>
+        <div class="lab-layout"><aside class="lab-library" id="lab-library"></aside><article class="lab-reader" id="lab-reader"></article></div>
+      </section>
+
+      <section class="view" id="view-quiz">
+        <div class="page-heading"><div><div class="section-overline">QUESTION BANK</div><h1>بنك الأسئلة والتدريب</h1><p>أسئلة فهم وتطبيق ومسائل قصيرة، ومع كل إجابة تفسير يوضح السبب.</p></div><span class="soft-pill" id="question-total">200+ سؤال</span></div>
+        <div class="quiz-setup" id="quiz-setup">
+          <div class="setup-field"><label for="quiz-unit">الوحدة</label><select id="quiz-unit"><option value="all">المنهج كله</option><option value="1">الوحدة الأولى: النظام البيئي المائي</option><option value="2">الوحدة الثانية: الغلاف الجوي</option></select></div>
+          <div class="setup-field"><label for="quiz-lesson">الدرس</label><select id="quiz-lesson"><option value="all">كل دروس الوحدة</option></select></div>
+          <div class="setup-field"><label for="quiz-count-select">عدد الأسئلة</label><select id="quiz-count-select"><option value="10">10 أسئلة</option><option value="15" selected>15 سؤالًا</option><option value="20">20 سؤالًا</option><option value="30">30 سؤالًا</option></select></div>
+          <button class="btn-primary" id="begin-quiz">ابدأ الاختبار <span>←</span></button>
         </div>
-        <div class="lesson-layout">
-          <article class="lesson-panel" id="lesson-content" aria-live="polite"></article>
-          <aside class="lesson-aside">
-            <div class="aside-card lesson-progress-card"><div class="aside-title"><span>تقدم الدرس</span><b id="lesson-progress-value">0%</b></div><div class="bar-track"><i id="lesson-progress-bar"></i></div><p id="lesson-progress-text">علّم الدرس كمكتمل بعد المذاكرة.</p><button class="complete-btn" id="complete-lesson">✓ علّمت الدرس كمكتمل</button></div>
-            <div class="aside-card"><div class="aside-title"><span>مفاتيح الدرس</span><span class="sparkle">✦</span></div><div id="lesson-keywords" class="keyword-list"></div></div>
-            <div class="aside-card tip-card"><div class="tip-symbol">✧</div><strong>نصيحة للمذاكرة</strong><p id="study-tip">اربط كل مصطلح بمثال من الحياة اليومية؛ الفهم يثبت أكثر من الحفظ المنفصل.</p></div>
-            <div class="aside-card quick-links"><div class="aside-title"><span>انتقل بسرعة</span></div><button data-jump="lab">⚗ المعمل التفاعلي <span>←</span></button><button data-jump="quiz">✎ اختبر نفسك <span>←</span></button><button data-jump="glossary">Aa قاموس المصطلحات <span>←</span></button></div>
-          </aside>
-        </div>
-      </div>
-
-      <section id="view-lab" class="view-panel">
-        <div class="section-heading"><div><div class="eyebrow muted">VIRTUAL SCIENCE LAB</div><h2>المعمل التفاعلي</h2><p>غيّر المتغيرات وشاهد كيف تتغير النتيجة. كل محاكاة معها تفسير علمي.</p></div><span class="small-chip"><i></i> جرّب بنفسك</span></div>
-        <div class="lab-tabs" id="lab-tabs"></div>
-        <div class="lab-stage" id="lab-stage"></div>
-        <div class="experiment-library"><div class="subheading"><div><h3>تجارب منزلية آمنة</h3><p>أنشطة بسيطة باستخدام أدوات يومية، بدون لهب أو مواد خطرة.</p></div><span class="safe-tag">✦ SAFE LAB</span></div><div class="experiment-grid" id="experiment-grid"></div></div>
+        <div class="quiz-session" id="quiz-session" hidden></div>
       </section>
 
-      <section id="view-quiz" class="view-panel">
-        <div class="section-heading"><div><div class="eyebrow muted">CHECK YOUR UNDERSTANDING</div><h2>مركز الاختبارات</h2><p>أسئلة متنوعة من الدروس الـ14 مع تفسير الإجابة بعد الاختيار.</p></div><span class="small-chip">تدريب بدون درجات نهائية</span></div>
-        <div class="quiz-toolbar"><label>اختر الدرس <select id="quiz-lesson-select"><option value="all">كل المنهج</option></select></label><span id="quiz-count">42 سؤالًا</span><button class="outline-btn" id="shuffle-quiz">خلط الأسئلة ↻</button></div>
-        <div id="quiz-area" class="quiz-list"></div>
-      </section>
-
-      <section id="view-glossary" class="view-panel">
-        <div class="section-heading"><div><div class="eyebrow muted">SCIENCE DICTIONARY</div><h2>قاموس المصطلحات</h2><p>ابحث عن المصطلح الإنجليزي أو العربي، واضغط عليه لعرض تعريفه ومثال عليه.</p></div><span class="small-chip" id="glossary-count">0 مصطلح</span></div>
-        <div class="glossary-search"><span>⌕</span><input type="search" id="glossary-search" placeholder="مثال: Polarity أو القطبية..."></div>
+      <section class="view" id="view-glossary">
+        <div class="page-heading"><div><div class="section-overline">SCIENCE GLOSSARY</div><h1>قاموس المصطلحات</h1><p>اكتب المصطلح بالعربي أو الإنجليزي. افتح أي كلمة لفهم معناها وسياق استخدامها.</p></div><span class="soft-pill" id="glossary-count">0 مصطلح</span></div>
+        <label class="glossary-search"><span>⌕</span><input id="glossary-search" type="search" placeholder="مثال: Osmosis أو الخاصية الأسموزية..."></label>
         <div class="glossary-grid" id="glossary-grid"></div>
       </section>
 
-      <section id="view-map" class="view-panel">
-        <div class="section-heading"><div><div class="eyebrow muted">THE COMPLETE SYLLABUS</div><h2>خريطة المنهج</h2><p>14 درسًا مرتبة وفق وحدتي الترم الأول.</p></div><span class="small-chip">2026–2027</span></div>
-        <div class="map-summary"><div><b>01</b><span>النظام البيئي المائي</span><small>10 دروس</small></div><div class="map-summary-line"></div><div><b>02</b><span>الغلاف الجوي</span><small>4 دروس</small></div></div>
-        <div id="curriculum-map" class="curriculum-map"></div>
-        <div class="sources-note"><div class="sources-icon">⌑</div><div><strong>عن المحتوى والمراجع</strong><p>الشرح هنا مكتوب بصياغة تعليمية أصلية اعتمادًا على عناوين المنهج والمفاهيم العلمية الأساسية، وليس نسخًا من كتاب خارجي. راجع أحدث نسخة من كتاب الوزارة للتأكد من أي تحديثات أو تفاصيل مطلوبة في مدرستك.</p><a href="https://ellibrary.moe.gov.eg/Books-sec/" target="_blank" rel="noopener">مكتبة وزارة التربية والتعليم ↗</a><span>ترتيب الدروس: كتاب العلوم المتكاملة، الصف الأول الثانوي، الترم الأول 2026–2027.</span></div></div>
+      <section class="view" id="view-map">
+        <div class="page-heading"><div><div class="section-overline">COMPLETE CURRICULUM</div><h1>خريطة المنهج</h1><p>الفهرس مقسّم بحسب ترتيب دروس العلوم المتكاملة للصف الأول الثانوي.</p></div><span class="soft-pill">14 / 14 درسًا</span></div>
+        <div class="curriculum-banner"><div><span>01</span><strong>النظام البيئي المائي</strong><small>Aquatic Ecosystems • 10 دروس</small></div><div class="banner-wave">≈</div><div><span>02</span><strong>الغلاف الجوي</strong><small>The Atmosphere • 4 دروس</small></div></div>
+        <div class="curriculum-grid" id="curriculum-grid"></div>
+        <div class="reference-panel"><div class="reference-title"><span>⌑</span><div><strong>المراجع العلمية والتعليمية</strong><small>صياغة الشرح أصلية، والمراجع التالية للمطابقة والمراجعة الإضافية.</small></div></div><div class="reference-links" id="reference-links"></div><p class="reference-disclaimer">الموقع أداة شرح ومراجعة مستقلة، وليس موقعًا تابعًا لوزارة التربية والتعليم أو لأي ناشر تجاري. قد تختلف بعض القيم التقريبية بين المراجع العلمية بسبب اختلاف طريقة تصنيف خزانات الماء أو ظروف القياس؛ ويُذكر داخل الدرس الرقم المستخدم في سياق المنهج مع توضيح المقصود به.</p></div>
       </section>
 
-      <footer class="site-footer"><span>مختبر العلوم <b>•</b> تعلّم بالفهم والتجربة</span><span>صُنع للتعلّم — لا يحتاج إلى حساب أو تسجيل دخول</span></footer>
+      <footer class="site-footer"><span>أكاديمية العلوم <b>•</b> افهم الفكرة قبل ما تحفظها</span><span>لا يحتاج حسابًا — يُحفظ تقدمك على هذا الجهاز فقط</span></footer>
     </main>
   </div>
-  <div class="toast" id="toast" role="status"></div>
-  <dialog id="term-dialog" class="term-dialog"><button class="dialog-close" id="dialog-close" aria-label="إغلاق">×</button><div class="dialog-kicker">SCIENCE TERM</div><h3 id="dialog-term"></h3><p class="dialog-ar" id="dialog-ar"></p><p id="dialog-desc"></p><div class="dialog-example" id="dialog-example"></div></dialog>
+
+  <dialog class="term-modal" id="term-modal"><button class="modal-close" id="close-term" aria-label="إغلاق">×</button><div class="modal-kicker">SCIENCE TERM</div><h2 id="term-en"></h2><h3 id="term-ar"></h3><p id="term-description"></p><div class="modal-example" id="term-example"></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
   <script src="lessons.js"></script>
   <script src="experiments.js"></script>
   <script src="app.js"></script>

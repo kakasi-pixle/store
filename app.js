@@ -1,620 +1,331 @@
+/* AquaScience — client-side learning platform, no login, no external libraries. */
 (() => {
   'use strict';
-
+  const $ = (s, root=document) => root.querySelector(s);
+  const $$ = (s, root=document) => [...root.querySelectorAll(s)];
   const lessons = window.SCIENCE_LESSONS || [];
-  const glossary = window.SCIENCE_GLOSSARY || [];
+  const glossaryRaw = window.SCIENCE_GLOSSARY || [];
   const labs = window.SCIENCE_LABS || [];
-  const experiments = window.HOME_EXPERIMENTS || [];
-  const $ = (selector, root = document) => root.querySelector(selector);
-  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  const storeKey = 'science-lab-progress-v1';
+  const store = {
+    read(key, fallback) { try { const v=localStorage.getItem(key); return v===null?fallback:JSON.parse(v); } catch { return fallback; } },
+    write(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+  };
+  const state = {
+    view:'home', lessonId:1, labId:labs[0]?.id || 'water-distribution',
+    completed:new Set(store.read('aqua-completed', [])),
+    quizQuestions:[], quizIndex:0, quizScore:0, quizAnswers:[], quizDone:false,
+    theme:store.read('aqua-theme','dark'), searchTerm:'', toastTimer:null
+  };
+  const glossary = glossaryRaw.map(row => Array.isArray(row)
+    ? {en:row[0]||'', ar:row[1]||'', definition:row[2]||'', example:row[3]||''}
+    : {en:row.en||row.english||'', ar:row.ar||row.arabic||'', definition:row.definition||row.meaning||'', example:row.example||''}
+  );
+  const refs = [
+    {name:'كتاب الوزارة — المكتبة الإلكترونية',url:'https://ellibrary.moe.gov.eg/Books-sec/',note:'للوصول إلى الكتب الدراسية الرسمية المتاحة.'},
+    {name:'فهرس كتاب العلوم المتكاملة للصف الأول الثانوي',url:'https://sahl.io/eg/book/1411/أول-ثانوي/العلوم-المتكاملة',note:'مطابقة ترتيب الوحدتين والدروس الـ14.'},
+    {name:'USGS — توزيع الماء على الأرض',url:'https://www.usgs.gov/water-science-school/science/how-much-water-there-earth',note:'مرجع علمي لنسب خزانات الماء والمياه العذبة.'},
+    {name:'USGS — دورة الماء (عربي)',url:'https://water.usgs.gov/edu/watercyclearabic.html',note:'شرح دورة الماء ومصادر المياه.'},
+    {name:'NOAA — دورة الماء',url:'https://www.noaa.gov/education/resource-collections/freshwater/water-cycle',note:'التبخر والتكاثف والهطول والجريان.'},
+    {name:'NOAA — طبقات الغلاف الجوي',url:'https://www.noaa.gov/jetstream/atmosphere/layers-of-atmosphere',note:'الطبقات والارتفاعات التقريبية والظواهر.'},
+    {name:'NASA — كيمياء الأوزون في ضوء الشمس',url:'https://science.nasa.gov/earth/earth-observatory/chemistry-in-the-sunlight/',note:'تفكك الأكسجين وتكوين الأوزون ودور الأشعة.'},
+    {name:'NASA — تأثير الاحتباس الحراري',url:'https://science.nasa.gov/climate-change/faq/what-is-the-greenhouse-effect/',note:'آلية امتصاص وإعادة إصدار الأشعة تحت الحمراء.'},
+    {name:'EPA — الأمطار الحمضية',url:'https://www.epa.gov/acidrain/what-acid-rain',note:'مصادر المطر الحمضي وآثاره وطرق تقليله.'}
+  ];
 
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(storeKey) || '{}'); } catch { saved = {}; }
-  const completed = new Set(Array.isArray(saved.completed) ? saved.completed : []);
-  const answered = new Map();
-  let activeLesson = 1;
-  let activeView = 'learn';
-  let activeLab = labs[0]?.id || 'water';
-  let ozonePhase = 0;
-  let quizOrder = [];
-  let toastTimer;
-
-  const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[char]));
-
-  function persist() {
-    try {
-      localStorage.setItem(storeKey, JSON.stringify({ completed: [...completed] }));
-    } catch { showToast('تعذر حفظ التقدم على هذا المتصفح.'); }
-    updateProgress();
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const attr = value => esc(value).replace(/`/g,'&#96;');
+  const termButton = name => `<button class="term-inline" data-term="${attr(name)}" title="اضغط لشرح المصطلح">${esc(name)}</button>`;
+  function rich(text) {
+    let safe=esc(text);
+    safe=safe.replace(/\{\{([^}]+)\}\}/g,(_,t)=>termButton(t.trim()));
+    safe=safe.replace(/(H₂O|O₂|O₃|CO₂|CO|SO₂|SO₃|NO₂|NO₃|N₂|H₂SO₄|HNO₃|CaCO₃|H₃O⁺|OH⁻)/g,'<strong class="chem">$1</strong>');
+    safe=safe.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    return safe;
   }
-
-  function showToast(message) {
-    const toast = $('#toast');
-    if (!toast) return;
-    toast.textContent = message;
-    toast.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
-  }
-
-  function findTerm(term) {
-    const target = String(term).toLowerCase();
-    return glossary.find(item => item[0].toLowerCase() === target)
-      || glossary.find(item => item[0].toLowerCase().includes(target))
-      || glossary.find(item => item[1] === term);
-  }
-
-  function richText(value) {
-    let text = escapeHTML(value);
-    text = text.replace(/\{\{(.+?)\}\}/g, (_, word) => {
-      const cleaned = word.trim();
-      return `<button class="term" type="button" data-term="${escapeHTML(cleaned)}">${escapeHTML(cleaned)}</button>`;
-    });
-    return text;
-  }
-
-  function renderParagraphs(paragraphs) {
-    if (!Array.isArray(paragraphs)) return '';
-    return paragraphs.map(p => `<p>${richText(p)}</p>`).join('');
-  }
-
-  function renderCards(cards) {
-    if (!cards?.length) return '';
-    return `<div class="mini-cards">${cards.map(card => `<article class="mini-card"><strong>${richText(card.title)}</strong><p>${richText(card.text)}</p></article>`).join('')}</div>`;
-  }
-
-  function renderTable(table) {
-    if (!table?.headers || !table?.rows) return '';
-    return `<div class="table-scroll"><table class="content-table"><thead><tr>${table.headers.map(head => `<th>${richText(head)}</th>`).join('')}</tr></thead><tbody>${table.rows.map(row => `<tr>${row.map(cell => `<td>${richText(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  }
-
-  function renderCallout(callout) {
-    if (!callout) return '';
-    const type = callout.type === 'warning' ? 'warning-box' : 'info-box';
-    return `<div class="info-box ${type}"><strong>${richText(callout.title || 'معلومة مهمة')}</strong><p>${richText(callout.text || '')}</p></div>`;
-  }
-
-  function renderSection(section, index) {
-    return `<section class="lesson-section">
-      <h3><span class="section-index">${String(index + 1).padStart(2, '0')}</span>${richText(section.title)}</h3>
-      ${renderParagraphs(section.paragraphs)}
-      ${section.paragraphs2 ? renderParagraphs(section.paragraphs2) : ''}
-      ${section.bullets?.length ? `<ul>${section.bullets.map(item => `<li>${richText(item)}</li>`).join('')}</ul>` : ''}
-      ${section.formula ? `<div class="formula-box">${escapeHTML(section.formula).replace(/\n/g, '<br>')}</div>` : ''}
-      ${renderTable(section.table)}
-      ${renderCards(section.cards)}
-      ${section.example ? `<div class="info-box"><strong>مثال من الحياة</strong><p>${richText(section.example)}</p></div>` : ''}
-      ${renderCallout(section.callout)}
-    </section>`;
-  }
-
-  function visualMarkup(visual) {
-    const baseCaption = '<span class="visual-caption">رسم توضيحي تفاعلي مبسط</span>';
-    if (visual === 'water-cycle') return `<div class="lesson-visual"><div class="water-cycle-art"><div class="cycle-sun"></div><div class="cycle-cloud"></div><span class="cycle-arrow arrow-up">➜</span><span class="cycle-arrow arrow-right">➜</span><span class="cycle-arrow arrow-down">➜</span><i class="droplet"></i><i class="droplet"></i><i class="droplet"></i><div class="cycle-sea"></div></div>${baseCaption}</div>`;
-    if (visual === 'molecule') return `<div class="lesson-visual"><div class="molecule"><div class="bond left"></div><div class="bond right"></div><div class="atom atom-o">O</div><div class="atom atom-h left">H</div><div class="atom atom-h right">H</div><span class="charge left">δ+</span><span class="charge right">δ+</span><span class="charge" style="left:94px;top:39px">δ−</span></div>${baseCaption}</div>`;
-    if (visual === 'layers') return `<div class="lesson-visual"><div class="layers-stack"><div class="layer-row" style="background:#365d89"><b>Exosphere</b><small>500+ km</small></div><div class="layer-row" style="background:#5369a4"><b>Thermosphere</b><small>85–500 km</small></div><div class="layer-row" style="background:#437f9d"><b>Mesosphere</b><small>50–85 km</small></div><div class="layer-row" style="background:#328d91"><b>Stratosphere</b><small>12–50 km</small></div><div class="layer-row" style="background:#3b9b82"><b>Troposphere</b><small>0–12 km</small></div></div>${baseCaption}</div>`;
-    if (visual === 'ozone') return `<div class="lesson-visual"><div class="ozone-atoms"><div class="oxygen-particle">O₂</div><span class="reaction-arrow">→</span><div class="reaction-result show"><i class="oxygen-particle small">O</i><i class="oxygen-particle small">O</i></div><span class="reaction-plus">+</span><span class="uv-rays active">UV ✦</span></div>${baseCaption}</div>`;
-    if (visual === 'density') return `<div class="lesson-visual"><div class="water-beaker"><div class="beaker-liquid"></div><div class="ice-cube"></div><div class="beaker-label">H₂O</div></div>${baseCaption}</div>`;
-    if (visual === 'pressure') return `<div class="lesson-visual"><div class="pressure-depth"><div class="depth-line" style="top:25%"></div><div class="depth-line" style="top:50%"></div><div class="depth-line" style="top:75%"></div><span class="diver" style="top:45%">◉</span><span class="pressure-value">P = ρgh</span></div>${baseCaption}</div>`;
-    if (visual === 'osmosis') return `<div class="lesson-visual"><div class="solution-side left"></div><div class="solution-side right"></div><div class="membrane"></div><span class="flow-arrow">⇢</span>${baseCaption}</div>`;
-    if (visual === 'greenhouse') return `<div class="lesson-visual"><div class="greenhouse-sky"><div class="greenhouse-sun"></div><div class="heat-layer"></div><div class="heat-ray ray-in"></div><div class="heat-ray ray-out"></div><div class="earth-surface"></div><span class="heat-molecule" style="top:36px;right:27%">CO₂</span><span class="heat-molecule" style="top:80px;right:65%">CH₄</span></div>${baseCaption}</div>`;
-    if (visual === 'gases') return `<div class="lesson-visual"><div style="display:grid;grid-template-columns:1fr 1fr;gap:35px;align-items:end"><div style="text-align:center"><span style="font:800 28px var(--latin);color:#75d8ed">O₂</span><div style="font-size:10px;color:#a9c4d0">أكسجين مذاب</div><div style="height:70px;width:95px;margin:10px auto 0;background:linear-gradient(0deg,#137da5,#65cfe0);border-radius:5px 5px 13px 13px;position:relative"><i style="position:absolute;top:13px;left:20px;color:white">○ ○</i><i style="position:absolute;top:35px;right:15px;color:white">○ ○</i></div></div><div style="text-align:center"><span style="font:800 28px var(--latin);color:#f5c878">CO₂</span><div style="font-size:10px;color:#a9c4d0">ثاني أكسيد الكربون</div><div style="height:70px;width:95px;margin:10px auto 0;background:linear-gradient(0deg,#17677d,#4fb3c5);border-radius:5px 5px 13px 13px;position:relative"><i style="position:absolute;top:13px;left:20px;color:white">○ ○</i><i style="position:absolute;top:35px;right:15px;color:white">○ ○</i></div></div></div>${baseCaption}</div>`;
-    if (visual === 'light') return `<div class="lesson-visual"><div style="position:absolute;top:0;bottom:0;left:0;right:0;background:linear-gradient(180deg,rgba(250,201,112,.22),rgba(27,126,169,.25) 44%,rgba(4,17,42,.7))"></div><div style="position:absolute;top:14px;left:23%;font-size:27px;color:#ffd57a">☀</div><div style="position:absolute;top:65px;right:15%;left:15%;height:1px;background:linear-gradient(90deg,#fa7676,#f6c26a,#b8df84,#6fd4d5,#7898f5);box-shadow:0 0 16px #64b9e7"></div><div style="position:absolute;bottom:22px;right:18%;left:18%;display:flex;justify-content:space-between;color:#cceaf4;font-size:10px"><span>Photic Zone</span><span>Aphotic Zone</span></div>${baseCaption}</div>`;
-    if (visual === 'cell') return `<div class="lesson-visual"><div style="width:200px;height:120px;border:3px solid #80cfa8;border-radius:50%;background:rgba(70,151,130,.13);position:relative;box-shadow:inset 0 0 30px rgba(80,200,160,.1)"><span style="position:absolute;top:34px;right:75px;width:42px;height:42px;border-radius:50%;background:rgba(162,152,255,.5);border:1px solid #b3a7ff"></span><span style="position:absolute;top:15px;right:23px;width:22px;height:11px;border-radius:50%;background:#df9a75"></span><span style="position:absolute;bottom:18px;left:33px;width:24px;height:10px;border-radius:50%;background:#e2b36b"></span></div>${baseCaption}</div>`;
-    if (visual === 'fish' || visual === 'ecosystem') return `<div class="lesson-visual"><div style="font-size:54px;filter:drop-shadow(0 5px 12px rgba(0,0,0,.2));animation:float 4s ease-in-out infinite">${visual === 'fish' ? '🐟' : '🐠　🪸　🐟'}</div><div style="position:absolute;bottom:24px;right:16%;left:16%;height:22px;background:linear-gradient(90deg,#176b78,#47af9c);border-radius:50% 50% 0 0"></div>${baseCaption}</div>`;
-    if (visual === 'atmosphere') return `<div class="lesson-visual"><div style="width:240px;height:130px;position:relative;border-radius:100% 100% 8px 8px;background:linear-gradient(180deg,rgba(125,161,241,.12),rgba(63,181,186,.23));border-top:1px solid rgba(136,199,245,.6)"><div style="position:absolute;top:14px;left:18px;color:#f6c66d">☀</div><div style="position:absolute;top:44px;right:45px;color:#bbdff4">☁</div><div style="position:absolute;bottom:0;right:0;left:0;height:17px;background:#3e9d83;border-radius:50% 50% 0 0"></div></div>${baseCaption}</div>`;
-    return '';
-  }
-
-  function renderLesson() {
-    const lesson = lessons.find(item => item.id === activeLesson) || lessons[0];
-    if (!lesson) return;
-    const unitName = lesson.unit === 1 ? 'UNIT 01 • AQUATIC ECOSYSTEMS' : 'UNIT 02 • THE ATMOSPHERE';
-    const goals = lesson.goals?.length ? `<div class="info-box"><strong>هتتعلم إيه في الدرس؟</strong><ul>${lesson.goals.map(goal => `<li>${richText(goal)}</li>`).join('')}</ul></div>` : '';
-    const content = `<div class="lesson-hero">
-      <div class="lesson-unit">${unitName} — الدرس ${String(lesson.id).padStart(2, '0')}</div>
-      <h2>${escapeHTML(lesson.title)}</h2><div class="lesson-en">${escapeHTML(lesson.en)}</div>
-      <p class="lesson-intro">${escapeHTML(lesson.intro)}</p>
-      <div class="lesson-badges"><span>${escapeHTML(lesson.tag)}</span><span>${lesson.sections.length} محاور شرح</span><span>${lesson.quiz.length} أسئلة تدريبية</span></div>
-    </div>
-    ${visualMarkup(lesson.visual)}
-    ${goals}
-    ${lesson.sections.map(renderSection).join('')}
-    <div class="lesson-bottom-nav"><button data-lesson-prev ${lesson.id === 1 ? 'disabled' : ''}>→ الدرس السابق</button><button data-open-quiz>اختبر فهمك لهذا الدرس ✎</button><button data-lesson-next ${lesson.id === lessons.length ? 'disabled' : ''}>الدرس التالي ←</button></div>`;
-    $('#lesson-content').innerHTML = content;
-    $('#crumb-current').textContent = lesson.title;
-    $('#lesson-keywords').innerHTML = lesson.keywords.map(word => `<span>${escapeHTML(word)}</span>`).join('');
-    $('#study-tip').textContent = lesson.tip;
-    $('#lesson-progress-value').textContent = completed.has(lesson.id) ? '100%' : '0%';
-    $('#lesson-progress-bar').style.width = completed.has(lesson.id) ? '100%' : '0%';
-    $('#lesson-progress-text').textContent = completed.has(lesson.id) ? 'أحسنت! هذا الدرس مكتمل.' : 'علّم الدرس كمكتمل بعد المذاكرة.';
-    $('#complete-lesson').textContent = completed.has(lesson.id) ? '✓ الدرس مكتمل — اضغط لإلغاء' : '✓ علّمت الدرس كمكتمل';
-    renderLessonNav();
-  }
-
-  function renderLessonNav() {
-    const unitOne = lessons.filter(lesson => lesson.unit === 1);
-    const unitTwo = lessons.filter(lesson => lesson.unit === 2);
-    const makeGroup = (items, label) => `<div class="unit-label">${label}</div>${items.map(lesson => `<button class="lesson-link ${lesson.id === activeLesson ? 'active' : ''} ${completed.has(lesson.id) ? 'done' : ''}" data-lesson="${lesson.id}"><span class="lesson-number">${completed.has(lesson.id) ? '✓' : String(lesson.id).padStart(2, '0')}</span><span>${escapeHTML(lesson.title)}</span></button>`).join('')}`;
-    $('#lesson-nav').innerHTML = makeGroup(unitOne, 'UNIT 01 • النظام البيئي المائي') + makeGroup(unitTwo, 'UNIT 02 • الغلاف الجوي');
-  }
-
-  function updateProgress() {
-    const percentage = Math.round((completed.size / lessons.length) * 100);
-    $('#sidebar-percent').textContent = `${percentage}%`;
-    $('#sidebar-ring').style.background = `conic-gradient(var(--aqua) ${percentage * 3.6}deg,rgba(255,255,255,.1) 0deg)`;
-    $('#sidebar-progress-label').textContent = completed.size ? `${completed.size} من ${lessons.length} دروس مكتملة` : 'ابدأ أول درس';
-    $('#stat-progress').innerHTML = `${percentage}<span>%</span>`;
-    renderLessonNav();
-    renderMap();
-  }
-
-  function setView(view) {
-    if (!$('#view-' + view)) return;
-    activeView = view;
-    $$('.view-panel').forEach(panel => panel.classList.toggle('active', panel.id === `view-${view}`));
-    $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-    const names = {learn:'المحتوى التعليمي',lab:'المعمل التفاعلي',quiz:'مركز الاختبارات',glossary:'قاموس المصطلحات',map:'خريطة المنهج'};
-    $('#crumb-current').textContent = names[view] || '';
-    if (view === 'lab') renderLab(activeLab);
-    if (view === 'quiz') renderQuiz();
-    if (view === 'glossary') renderGlossary();
-    if (view === 'map') renderMap();
+  function lessonById(id){return lessons.find(l=>l.id===Number(id));}
+  function labById(id){return labs.find(l=>l.id===id);}
+  function getLessonLab(id){return labs.find(l=>l.lesson===Number(id));}
+  function questionsForLesson(lesson){ return [...(lesson.quiz||[])].map(q=>({...q,lessonId:lesson.id,lessonTitle:lesson.title})); }
+  function allQuestions(){ return lessons.flatMap(questionsForLesson); }
+  function toast(message){ const el=$('#toast'); if(!el)return; el.textContent=message;el.classList.add('show');clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=>el.classList.remove('show'),2600); }
+  function switchView(name){
+    if(!$('#view-'+name))return;
+    state.view=name;
+    $$('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
+    $$('.nav-button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+    const labels={home:'الرئيسية',lessons:'شرح الدروس',lab:'المعمل الافتراضي',quiz:'بنك الأسئلة',glossary:'قاموس المصطلحات',map:'خريطة المنهج'};
+    $('#breadcrumb-current').textContent=labels[name]||'العلوم المتكاملة';
     $('#sidebar').classList.remove('open');
     window.scrollTo({top:0,behavior:'smooth'});
+    if(name==='lessons')renderLessonBrowser();
+    if(name==='lab')renderLabLibrary();
+    if(name==='quiz')renderQuizSetup();
+    if(name==='glossary')renderGlossary($('#glossary-search')?.value||'');
+    if(name==='map')renderMap();
+  }
+  function renderSidebar(){
+    const host=$('#lesson-tree');
+    host.innerHTML=[1,2].map(unit=>`<div class="tree-unit"><div class="tree-unit-title">${unit===1?'UNIT 01 • AQUATIC':'UNIT 02 • ATMOSPHERE'}</div>${lessons.filter(l=>l.unit===unit).map(l=>`<button class="tree-lesson ${l.id===state.lessonId?'selected':''} ${state.completed.has(l.id)?'is-done':''}" data-lesson="${l.id}"><span>${String(l.id).padStart(2,'0')}</span><i>${esc(l.title)}</i>${state.completed.has(l.id)?'<b>✓</b>':''}</button>`).join('')}</div>`).join('');
+  }
+  function updateProgress(){
+    const done=state.completed.size, percent=Math.round(done/Math.max(1,lessons.length)*100);
+    $('#sidebar-percent').textContent=percent+'%';$('#sidebar-progress-bar').style.width=percent+'%';
+    $('#sidebar-progress-text').textContent=done?`أنهيت ${done} من ${lessons.length} درسًا`:'ابدأ أول درس لتسجيل تقدمك';
+    $('#stat-progress').innerHTML=`${percent}<i>%</i>`;
+    $('#stat-questions').innerHTML=`${allQuestions().length}<i>سؤال</i>`;
+    $('#nav-labs-count').textContent=labs.length;$('#stat-labs').innerHTML=`${labs.length}<i>محاكاة</i>`;
+    renderSidebar();
+  }
+  function renderHome(){
+    $('#featured-labs').innerHTML=labs.filter(l=>['water-distribution','water-cycle','water-molecule','osmosis','ozone-formation','greenhouse'].includes(l.id)).map(l=>labCard(l)).join('');
+    updateProgress();
+  }
+  function labCard(lab){return `<button class="lab-card" data-open-lab="${attr(lab.id)}"><span class="lab-card-icon">${lab.icon}</span><span class="lab-card-text"><b>${esc(lab.title)}</b><small>${esc(lab.en)}</small><em>${esc(lab.desc)}</em></span><span class="card-arrow">↗</span></button>`;}
+  function renderLessonBrowser(filter=''){
+    const host=$('#lesson-browser');
+    const term=filter.trim().toLowerCase();
+    host.innerHTML=[1,2].map(unit=>{
+      const rows=lessons.filter(l=>l.unit===unit && (!term || `${l.title} ${l.en} ${l.intro}`.toLowerCase().includes(term)));
+      if(!rows.length)return'';
+      return `<section class="lesson-unit-block"><header><div><span>UNIT 0${unit}</span><h2>${unit===1?'النظام البيئي المائي':'الغلاف الجوي'}</h2><small>${unit===1?'Aquatic Ecosystems':'The Atmosphere'}</small></div><b>${rows.length} دروس</b></header><div class="lesson-card-grid">${rows.map(l=>`<button class="lesson-card ${state.completed.has(l.id)?'done':''}" data-lesson="${l.id}"><span class="lesson-num">${String(l.id).padStart(2,'0')}</span><span class="lesson-card-copy"><b>${esc(l.title)}</b><small>${esc(l.en)}</small><em>${esc(l.tag||'شرح تفاعلي')}</em></span><span class="lesson-status">${state.completed.has(l.id)?'✓':'←'}</span></button>`).join('')}</div></section>`;
+    }).join('') || '<div class="empty-state">مفيش درس مطابق للبحث ده.</div>';
+    if(state.lessonId)renderLesson(state.lessonId);
+  }
+  const miniVisuals={
+    'water-cycle': {title:'دورة الماء',body:`<div class="mini-water-cycle"><div class="mini-sun">☀</div><div class="mini-cloud">☁</div><div class="mini-rain">⋮ ⋮ ⋮</div><div class="mini-mountain">⌁</div><div class="mini-sea">≈ ≈ ≈</div><span class="mini-arrow a1">↑ تبخر</span><span class="mini-arrow a2">↓ هطول</span><span class="mini-arrow a3">↗ نتح</span></div>`},
+    'water-distribution':{title:'توزيع ماء الأرض',body:`<div class="water-bars"><div class="water-bar-label"><span>ماء مالح</span><b>97.5%</b></div><div class="water-bar"><i style="width:97.5%"></i></div><div class="water-bar-label"><span>ماء عذب</span><b>2.5%</b></div><div class="water-bar fresh"><i style="width:2.5%"></i></div><div class="fresh-breakdown"><div><b>68.7%</b><span>جليد وأنهار جليدية</span></div><div><b>30.1%</b><span>مياه جوفية</span></div><div><b>1.2%</b><span>سطحية وأخرى</span></div></div><small>النسب الثلاث الأخيرة من إجمالي المياه العذبة فقط.</small></div>`},
+    'molecule':{title:'جزيء الماء القطبي',body:`<div class="molecule-mini"><span class="atom oxygen">O<small>δ−</small></span><span class="bond bond-left"></span><span class="atom hydrogen h-left">H<small>δ+</small></span><span class="bond bond-right"></span><span class="atom hydrogen h-right">H<small>δ+</small></span><div class="molecule-caption">شكل منحني • زاوية ≈ 104.5°</div></div>`},
+    'density':{title:'لماذا يطفو الجليد؟',body:`<div class="ice-mini"><div class="ice-water"><div class="ice-cube">جليد<br>أقل كثافة</div><i></i><i></i><i></i></div><div class="density-labels"><span>ρ الجليد ≈ 0.917 g/cm³</span><span>ρ الماء عند 4°C ≈ 1.000 g/cm³</span></div></div>`},
+    'osmosis':{title:'انتقال الماء عبر غشاء',body:`<div class="osmosis-mini"><div class="osm-side"><b>تركيز مذاب أقل</b><span>H₂O H₂O H₂O</span></div><div class="osm-membrane">◌ ◌ ◌</div><div class="osm-side high"><b>تركيز مذاب أعلى</b><span>● ● ● ● ●</span></div><div class="osm-arrow">الماء ينتقل نحو الجهة الأعلى في تركيز المذاب الفعال</div></div>`},
+    'atmosphere-layers':{title:'طبقات الغلاف الجوي',body:`<div class="layer-mini"><div class="layer exo">Exosphere</div><div class="layer thermo">Thermosphere</div><div class="layer meso">Mesosphere</div><div class="layer strato">Stratosphere • O₃</div><div class="layer tropo">Troposphere • Weather</div><div class="layer-earth">Earth</div></div>`},
+    'ozone-cycle':{title:'دورة تكوين الأوزون',body:`<div class="ozone-mini"><div>O₂</div><span>UV ↘</span><div>2O</div><span>+ O₂ + M</span><div class="ozone-result">O₃</div><small>تكوين وتحلل مستمران</small></div>`},
+    'greenhouse':{title:'تأثير الاحتباس الحراري',body:`<div class="greenhouse-mini"><div class="gh-sun">☀</div><div class="gh-earth">🌍</div><div class="gh-ray down">↓ إشعاع شمسي</div><div class="gh-ray up">↑ Infrared</div><div class="gh-loop">↘ امتصاص وإعادة إصدار ↙</div></div>`}
+  };
+  function visualBlock(visual, title='', paragraphs=[]){
+    const item=miniVisuals[visual];
+    if(item)return `<div class="lesson-visual"><div class="visual-head"><span>رسم توضيحي</span><b>${item.title}</b></div>${item.body}<button class="visual-open" data-open-visual="${attr(visual)}">افتح المحاكاة الكاملة ↗</button></div>`;
+    const name=visual||'concept';
+    const first=String(paragraphs[0]||'').replace(/\{\{([^}]+)\}\}/g,'$1').slice(0,112);
+    const second=String(paragraphs[1]||'').replace(/\{\{([^}]+)\}\}/g,'$1').slice(0,112);
+    const lab=getLessonLab(state.lessonId);
+    return `<div class="lesson-visual concept-visual"><div class="visual-head"><span>خريطة الفكرة</span><b>${esc(title||'تصوّر المفهوم')}</b></div><div class="concept-flow"><div><i>01</i><b>الفكرة</b><small>${esc(title||'المفهوم العلمي')}</small></div><em>←</em><div><i>02</i><b>الآلية</b><small>${esc(first||'نفهم العلاقة بين أجزاء الفكرة.')}</small></div><em>←</em><div><i>03</i><b>النتيجة</b><small>${esc(second||'نربط الشرح بالتطبيق والملاحظة.')}</small></div></div><button class="visual-open" data-open-visual="${attr(name)}">افتح المحاكاة المرتبطة بالدرس ↗</button></div>`;
+  }
+  function renderCallout(callout){
+    if(!callout)return'';
+    const type=callout.type||'note';
+    return `<aside class="lesson-callout ${attr(type)}"><span>${type==='warning'?'!':type==='important'?'✦':'ⓘ'}</span><div><b>${rich(callout.title||'ملاحظة')}</b><p>${rich(callout.text||'')}</p></div></aside>`;
+  }
+  function renderSection(section,index){
+    const paragraphs=(section.paragraphs||[]).map(p=>`<p>${rich(p)}</p>`).join('');
+    const paragraphs2=(section.paragraphs2||[]).map(p=>`<p>${rich(p)}</p>`).join('');
+    const bullets=section.bullets?.length?`<ul class="lesson-bullets">${section.bullets.map(x=>`<li>${rich(x)}</li>`).join('')}</ul>`:'';
+    const cards=section.cards?.length?`<div class="concept-grid">${section.cards.map(c=>`<article class="concept-card"><b>${rich(c.title)}</b><p>${rich(c.text)}</p></article>`).join('')}</div>`:'';
+    const table=section.table?`<div class="science-table-wrap"><table class="science-table"><thead><tr>${section.table.headers.map(h=>`<th>${rich(h)}</th>`).join('')}</tr></thead><tbody>${section.table.rows.map(row=>`<tr>${row.map(cell=>`<td>${rich(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'';
+    const formula=section.formula?`<div class="formula-box"><small>العلاقة أو المعادلة</small><code>${rich(section.formula)}</code></div>`:'';
+    const example=section.example?`<div class="worked-example simple-example"><div class="worked-title">مثال تطبيقي</div><p>${rich(section.example)}</p></div>`:'';
+    const worked=section.worked?`<div class="worked-example"><div class="worked-title">✦ ${rich(section.worked.title||'مثال محلول')}</div><ol>${section.worked.steps.map(st=>`<li>${rich(st)}</li>`).join('')}</ol><div class="worked-result">${rich(section.worked.result||'')}</div></div>`:'';
+    const steps=section.steps?.length?`<div class="step-list">${section.steps.map((st,i)=>`<div><i>${i+1}</i><p>${rich(st)}</p></div>`).join('')}</div>`:'';
+    const visual=visualBlock(section.visual||'concept',section.title,section.paragraphs||[]);
+    return `<article class="lesson-section" id="lesson-section-${index}"><header class="lesson-section-heading"><span>${String(index+1).padStart(2,'0')}</span><h3>${rich(section.title||'شرح الفكرة')}</h3></header><div class="section-copy">${paragraphs}${paragraphs2}${bullets}${table}${formula}${cards}${example}${worked}${steps}${renderCallout(section.callout)}${visual}</div></article>`;
+  }
+  function renderLesson(id){
+    const lesson=lessonById(id);if(!lesson)return;
+    state.lessonId=lesson.id;
+    $('#lesson-reader').innerHTML=`<div class="reader-topline"><span>UNIT 0${lesson.unit} • LESSON ${String(lesson.id).padStart(2,'0')}</span><span>${lesson.sections.length} جزءًا للشرح</span></div><header class="lesson-hero"><div class="lesson-hero-number">${String(lesson.id).padStart(2,'0')}</div><div><span class="lesson-tag">${esc(lesson.tag||'شرح تفصيلي')}</span><h2>${esc(lesson.title)}</h2><p class="lesson-en">${esc(lesson.en)}</p><p>${rich(lesson.intro||'')}</p></div></header><div class="lesson-toolbar"><button class="btn-primary" data-complete="${lesson.id}">${state.completed.has(lesson.id)?'✓ تم إنهاء الدرس':'علّم الدرس كمكتمل'}</button><button class="btn-secondary" data-open-lesson-quiz="${lesson.id}">اختبر فهمك <span>✎</span></button><button class="btn-secondary" data-open-lab-for-lesson="${lesson.id}">محاكاة الدرس <span>⚗</span></button></div><section class="learning-goals"><h3>هتكون قادر على إيه بعد الدرس؟</h3><div class="goal-grid">${(lesson.goals||[]).map(g=>`<div><span>✓</span>${rich(g)}</div>`).join('')}</div></section><div class="lesson-sections">${lesson.sections.map(renderSection).join('')}</div><div class="lesson-tip"><span>✦</span><div><b>اختبر نفسك بعد الفهم</b><p>${rich(lesson.tip||'ارجع إلى الأفكار الرئيسية ثم حل أسئلة الدرس.')}</p></div></div><div class="lesson-end-actions"><button class="btn-primary" data-complete="${lesson.id}">${state.completed.has(lesson.id)?'تم تسجيل إنجاز الدرس':'أنهيت الدرس — سجّل إنجازي'}</button><button class="btn-secondary" data-open-lesson-quiz="${lesson.id}">ابدأ أسئلة الدرس ←</button></div>`;
+    $$('.tree-lesson').forEach(b=>b.classList.toggle('selected',Number(b.dataset.lesson)===lesson.id));
+    const next=lessons.find(l=>l.id===lesson.id+1);if(next){$('#lesson-reader').insertAdjacentHTML('beforeend',`<button class="next-lesson" data-lesson="${next.id}"><span>الدرس التالي</span><b>${esc(next.title)}</b><i>←</i></button>`);}
+  }
+  function setComplete(id){
+    const n=Number(id);state.completed.add(n);store.write('aqua-completed',[...state.completed]);updateProgress();renderLesson(n);toast('تم تسجيل إنجاز الدرس على هذا الجهاز ✓');
   }
 
-  function renderMap() {
-    const groups = [
-      {unit:1,title:'النظام البيئي المائي',en:'Aquatic Ecosystems',desc:'10 دروس • الماء والحياة في البيئات المائية'},
-      {unit:2,title:'الغلاف الجوي',en:'The Atmosphere',desc:'4 دروس • مكونات الجو وتفاعلاته واستدامته'}
-    ];
-    $('#curriculum-map').innerHTML = groups.map(group => {
-      const items = lessons.filter(lesson => lesson.unit === group.unit);
-      return `<section class="map-unit"><div class="map-unit-head"><span class="map-unit-number">0${group.unit}</span><div><strong>${group.title}</strong><small>${group.en} • ${group.desc}</small></div></div>${items.map(lesson => `<button class="map-lesson" data-map-lesson="${lesson.id}"><span class="map-num">${String(lesson.id).padStart(2,'0')}</span><span>${escapeHTML(lesson.title)}</span><span class="map-check">${completed.has(lesson.id) ? '✓' : '›'}</span></button>`).join('')}</section>`;
-    }).join('');
+  function renderLabLibrary(){
+    $('#lab-library').innerHTML=`<div class="lab-library-title"><b>اختر محاكاة</b><small>${labs.length} نموذج تفاعلي</small></div>${[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map(lessonId=>{
+      const list=labs.filter(l=>l.lesson===lessonId);if(!list.length)return'';
+      const lesson=lessonById(lessonId);
+      return `<div class="lab-group"><span>${String(lessonId).padStart(2,'0')} • ${esc(lesson?.title||'')}</span>${list.map(l=>`<button class="lab-list-item ${l.id===state.labId?'selected':''}" data-open-lab="${attr(l.id)}"><i>${l.icon}</i><span><b>${esc(l.title)}</b><small>${esc(l.en)}</small></span><em>↗</em></button>`).join('')}</div>`;
+    }).join('')}`;
+    renderLab(state.labId);
+  }
+  function labHeader(lab){return `<div class="lab-reader-head"><div><span class="lab-kicker">VIRTUAL EXPERIMENT • LESSON ${String(lab.lesson).padStart(2,'0')}</span><h2>${esc(lab.title)}</h2><p>${esc(lab.en)}</p></div><span class="level-chip">${esc(lab.level)}</span></div><p class="lab-description">${esc(lab.desc)}</p>`;}
+  function labFooter(lab){return `<div class="lab-explain"><span>الفكرة العلمية</span><p>${esc(lab.desc)} القيم المعروضة في هذا النموذج تعليمية وتوضيحية؛ وليست بديلًا عن قياسات معملية حقيقية أو نموذجًا تنبؤيًا كاملًا.</p><button class="text-link" data-lesson="${lab.lesson}" data-switch-lesson>ارجع إلى شرح الدرس ${lab.lesson} ←</button></div>`;}
+  function slider(id,label,min,max,value,unit='',step=1){return `<label class="control-field"><span>${label}</span><b><output id="${id}-out">${value}${unit}</output></b><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"></label>`;}
+  function labStage(content){return `<div class="simulation-stage">${content}</div>`;}
+  const labTemplates={
+    distribution:()=>`${labStage(`<div class="distribution-scene"><div class="earth-water"><div class="earth-land"></div><div class="earth-sea"></div><span>الأرض</span></div><div class="distribution-readout"><div class="dist-big"><strong>97.5%</strong><span>مياه مالحة</span></div><div class="dist-big fresh"><strong>2.5%</strong><span>مياه عذبة</span></div></div></div>`)}<div class="lab-controls">${slider('fresh-share','نسبة المياه العذبة من إجمالي ماء الأرض',0,5,2.5,'%',0.1)}<div class="split-bars"><div><span>مالحة</span><b id="salt-share">97.5%</b><i><em id="salt-bar" style="width:97.5%"></em></i></div><div><span>عذبة</span><b id="fresh-share-label">2.5%</b><i><em id="fresh-bar" style="width:2.5%"></em></i></div></div><div class="fresh-reservoirs"><h4>كبّر الجزء العذب فقط</h4><div><b>68.7%</b><span>جليد وأنهار جليدية</span></div><div><b>30.1%</b><span>مياه جوفية</span></div><div><b>1.2%</b><span>مياه سطحية وأخرى</span></div><small>من إجمالي المياه العذبة، وليس من إجمالي مياه الأرض.</small></div></div>`,
+    'water-cycle':()=>`${labStage(`<div class="cycle-scene"><div class="cycle-sun">☀</div><div class="cycle-cloud">☁</div><div class="cycle-mountain">▲ ▲</div><div class="cycle-river">≈≈≈≈≈</div><div class="cycle-tree">♣</div><div class="cycle-droplets">💧　💧　💧</div><div class="cycle-label evap">Evaporation ↑</div><div class="cycle-label cond">Condensation</div><div class="cycle-label precip">Precipitation ↓</div><div class="cycle-label trans">Transpiration ↑</div><div class="cycle-label runoff">Runoff ↘</div><div class="cycle-label infil">Infiltration ↓</div></div>`)}<div class="lab-controls"><div class="cycle-buttons"><button class="choice-btn active" data-cycle="evap">1 التبخر</button><button class="choice-btn" data-cycle="cond">2 التكاثف</button><button class="choice-btn" data-cycle="precip">3 الهطول</button><button class="choice-btn" data-cycle="runoff">4 الجريان والتسرب</button><button class="choice-btn" data-cycle="trans">5 النتح</button></div><div class="cycle-explanation" id="cycle-explanation"><b>Evaporation — التبخر</b><p>تكتسب جزيئات الماء طاقة وتتحول من الحالة السائلة إلى بخار يصعد إلى الغلاف الجوي. الطاقة الشمسية هي المصدر الرئيسي للتبخر الطبيعي.</p></div></div>`,
+    molecule:()=>`${labStage(`<div class="molecule-stage"><div class="big-molecule"><div class="bond b1"></div><div class="bond b2"></div><button class="big-atom oxygen" id="oxygen-atom">O<small>δ−</small></button><button class="big-atom hydrogen h1">H<small>δ+</small></button><button class="big-atom hydrogen h2">H<small>δ+</small></button><div class="angle-arc">104.5°</div></div><div class="molecule-facts"><b>H₂O</b><span>جزيء منحني وقطبي</span><small>ذرتا هيدروجين + ذرة أكسجين</small></div></div>`)}<div class="lab-controls"><div class="choice-row"><button class="choice-btn active" data-mol="charges">إظهار الشحنات الجزئية</button><button class="choice-btn" data-mol="bonds">إظهار الروابط</button><button class="choice-btn" data-mol="shape">إظهار الشكل والزاوية</button></div><div class="dynamic-explanation" id="molecule-explanation">الأكسجين أعلى سالبية كهربية من الهيدروجين؛ لذلك يجذب إلكترونات الرابطة نحوه نسبيًا، فيحمل شحنة جزئية سالبة δ− بينما يحمل الهيدروجين شحنة جزئية موجبة δ+.</div></div>`,
+    hydrogen:()=>`${labStage(`<div class="hydrogen-stage"><div class="water-pair"><div class="mini-water m-one"><b>O</b><i>H</i><i>H</i></div><div class="mini-water m-two"><b>O</b><i>H</i><i>H</i></div><div class="hbond-line"></div><span>Hydrogen bond</span></div><div class="hbond-legend"><span>— رابطة تساهمية داخل الجزيء</span><span>⋯ رابطة هيدروجينية بين الجزيئات</span></div></div>`)}<div class="lab-controls"><button class="btn-primary" id="toggle-hbond">إظهار / إخفاء الرابطة الهيدروجينية</button><div class="dynamic-explanation" id="hbond-explanation">الرابطة الهيدروجينية تجاذب بين جزيئات الماء؛ وهي أضعف من الرابطة التساهمية O–H داخل الجزيء، لكنها تؤثر في الخواص الجماعية للماء.</div></div>`,
+    dissolving:()=>`${labStage(`<div class="dissolve-beaker"><div class="beaker-liquid" id="beaker-ions"><span class="ion sodium">Na⁺</span><span class="ion chloride">Cl⁻</span><span class="ion sodium">Na⁺</span><span class="ion chloride">Cl⁻</span><span class="ion sodium">Na⁺</span><span class="ion chloride">Cl⁻</span></div><div class="beaker-caption">ماء + بلورة NaCl</div></div>`)}<div class="lab-controls"><button class="btn-primary" id="dissolve-step">ابدأ الذوبان</button><div class="dynamic-explanation" id="dissolve-explanation">تنجذب النهاية ذات الشحنة الجزئية السالبة في الماء إلى Na⁺، بينما تتجه النهايات ذات الشحنة الجزئية الموجبة نحو Cl⁻. يحيط الماء بالأيونات ويساعد على فصلها واستقرارها في المحلول.</div></div>`,
+    ionization:()=>`${labStage(`<div class="ionization-reaction"><div class="water-unit">H₂O</div><span>+</span><div class="water-unit">H₂O</div><span class="reaction-arrow">⇌</span><div class="ion-product">H₃O⁺</div><span>+</span><div class="ion-product base">OH⁻</div></div>`)}<div class="lab-controls"><button class="btn-primary" id="ionize-step">شاهد انتقال البروتون</button><p class="dynamic-explanation" id="ionize-explanation">يتفاعل جزيء ماء مع جزيء آخر؛ ينقل أحدهما بروتونًا H⁺ إلى الآخر، فتتكون أيونات الهيدرونيوم H₃O⁺ والهيدروكسيد OH⁻. يحدث ذلك بدرجة ضئيلة جدًا في الماء النقي.</p></div>`,
+    density:()=>`${labStage(`<div class="density-tank"><div class="ice-float" id="density-ice">ICE</div><div class="waterline"></div><div class="water-fill"></div><span class="float-label">الجليد يطفو لأن كثافته أقل</span></div><div class="density-metric"><strong id="density-value">0.99997</strong><small>g/cm³ تقريبًا للماء</small></div>`)}<div class="lab-controls">${slider('water-temp','درجة حرارة الماء',-5,30,4,'°C',1)}<div class="dynamic-explanation" id="density-explanation">تبلغ كثافة الماء النقي قيمة عظمى قرب 4°C. الجليد أقل كثافة من الماء السائل، لذلك يطفو.</div></div>`,
+    hydrometer:()=>`${labStage(`<div class="hydrometer-tank"><div class="hydro-liquid" id="hydro-liquid"></div><div class="hydrometer-stick" id="hydrometer-stick"><span></span><i></i><b></b></div><div class="hydrometer-mark">HYDROMETER</div></div><div class="hydro-reading"><strong id="hydro-reading">1.00</strong><small>كثافة نسبية تقريبية</small></div>`)}<div class="lab-controls">${slider('liquid-density','كثافة السائل',0.8,1.3,1,'',0.01)}<div class="dynamic-explanation" id="hydrometer-explanation">في السائل الأعلى كثافة يزيح مقياس الكثافة حجمًا أقل ليوازن وزنه، فيطفو أعلى ويغمر جزءًا أقل منه.</div></div>`,
+    'specific-heat':()=>`${labStage(`<div class="heat-vessels"><div class="heat-vessel"><b>ماء</b><div class="thermo"><i id="water-thermo"></i></div><strong id="water-rise">+0°C</strong></div><div class="heat-vessel sand"><b>رمل</b><div class="thermo"><i id="sand-thermo"></i></div><strong id="sand-rise">+0°C</strong></div></div><div class="energy-badge">نفس الطاقة والكتلة</div>`)}<div class="lab-controls">${slider('heat-energy','الطاقة الحرارية المضافة',0,50000,20000,' J',1000)}<div class="dynamic-explanation" id="heat-explanation">عند ثبات الكتلة والطاقة، ترتفع درجة حرارة الرمل أكثر لأن حرارته النوعية أقل من الماء.</div></div>`,
+    'heat-transfer':()=>`${labStage(`<div class="transfer-stage" id="transfer-scene"><div class="transfer-object">☀</div><div class="transfer-target">▰</div><div class="transfer-particles">·　·　·　·　·</div><span id="transfer-label">Energy travels as electromagnetic waves</span></div>`)}<div class="lab-controls"><div class="choice-row"><button class="choice-btn active" data-transfer="radiation">الإشعاع</button><button class="choice-btn" data-transfer="conduction">التوصيل</button><button class="choice-btn" data-transfer="convection">الحمل</button></div><div class="dynamic-explanation" id="transfer-explanation">الإشعاع ينقل الطاقة بموجات كهرومغناطيسية، ولا يحتاج إلى وسط مادي؛ لذلك تنتقل طاقة الشمس عبر الفضاء.</div></div>`,
+    osmosis:()=>`${labStage(`<div class="osmosis-cup"><div class="osm-compartment left"><b>الجانب A</b><div class="solute-dots" id="dots-a">● ●</div><span>ماء</span></div><div class="semi-membrane">غشاء<br>شبه منفذ</div><div class="osm-compartment right"><b>الجانب B</b><div class="solute-dots" id="dots-b">● ● ● ● ●</div><span>ماء</span></div><div class="osmotic-arrow" id="osmosis-arrow">H₂O →</div></div>`)}<div class="lab-controls">${slider('osm-a','تركيز المذاب في A',0,10,2,' وحدات')}${slider('osm-b','تركيز المذاب في B',0,10,7,' وحدات')}<div class="dynamic-explanation" id="osmosis-explanation">ينتقل الماء عبر غشاء شبه منفذ من الجهة الأقل في تركيز المذاب الفعال إلى الجهة الأعلى، حتى يتوازن التأثير أو تعوقه عوامل أخرى.</div></div>`,
+    ph:()=>`${labStage(`<div class="ph-meter"><div class="ph-scale"><span>حمضي</span><span>متعادل</span><span>قاعدي</span></div><div class="ph-spectrum"><i id="ph-marker" style="left:50%"></i></div><div class="ph-big"><strong id="ph-value">7</strong><span id="ph-kind">متعادل</span></div><div class="ph-examples"><span>ليمون ≈ 2</span><span>ماء نقي ≈ 7</span><span>صابون ≈ 10</span></div></div>`)}<div class="lab-controls">${slider('ph-slider','قيمة pH',0,14,7,'',0.1)}<div class="dynamic-explanation" id="ph-explanation">pH أقل من 7 حمضي، ويساوي 7 متعادل تقريبًا للماء النقي عند 25°C، وأكبر من 7 قاعدي. كل وحدة pH تمثل تغيرًا عشريًا في تركيز أيون الهيدرونيوم في النموذج المبسط.</div></div>`,
+    cell:()=>`${labStage(`<div class="cell-explorer"><div class="cell-drawing"><div class="cell-membrane"></div><button class="organelle nucleus" data-organelle="nucleus">●</button><button class="organelle mito" data-organelle="mitochondria">ϟ</button><button class="organelle ribo" data-organelle="ribosome">· ·</button><button class="organelle golgi" data-organelle="golgi">≋</button><button class="organelle vacuole" data-organelle="vacuole">◯</button><button class="organelle chloroplast" data-organelle="chloroplast">▥</button><span class="cell-label">خلية حقيقية النواة</span></div><div class="organelle-info" id="organelle-info"><b>اختر عضية</b><p>اضغط على أحد الأجزاء في الرسم لتقرأ وظيفته. الرسم تخطيطي وليس مقياسًا حقيقيًا.</p></div></div>`)}<div class="lab-controls"><div class="choice-row"><button class="choice-btn active" data-celltype="animal">خلية حيوانية</button><button class="choice-btn" data-celltype="plant">خلية نباتية</button></div><div class="dynamic-explanation" id="cell-explanation">الخلايا حقيقية النواة تحتوي نواة محاطة بغشاء وعضيات متخصصة. تختلف الخلية النباتية بوجود جدار خلوي وبلاستيدات خضراء وفجوة عصارية كبيرة غالبًا.</div></div>`,
+    fish:()=>`${labStage(`<div class="fish-stage"><div class="fish-figure">🐟<span class="fish-gills">)))</span><span class="fish-arrow" id="fish-water-arrow">H₂O ↓</span></div><div class="fish-salts" id="fish-salts">أملاح تنتقل للخارج؟</div><div class="fish-environment" id="fish-environment">ماء عذب</div></div>`)}<div class="lab-controls"><div class="choice-row"><button class="choice-btn active" data-fish="fresh">سمكة ماء عذب</button><button class="choice-btn" data-fish="sea">سمكة بحرية</button></div><div class="dynamic-explanation" id="fish-explanation">في الماء العذب يميل الماء إلى الدخول إلى جسم السمكة أسموزيًا لأن سوائل جسمها أعلى تركيزًا من الوسط. تطرح السمكة بولًا مخففًا نسبيًا وتمتص الأملاح عبر الخياشيم والغذاء.</div></div>`,
+    oxygen:()=>`${labStage(`<div class="oxygen-water"><div class="oxygen-bubbles" id="oxygen-bubbles">○　○ ○　○　○</div><div class="oxygen-fish">🐠</div><div class="oxygen-reading"><b id="oxygen-reading">9.1</b><small>اتجاه تشبّع تقريبي نسبي</small></div></div>`)}<div class="lab-controls">${slider('oxygen-temp','درجة حرارة الماء',0,35,10,'°C')}${slider('oxygen-salt','الملوحة (للتوضيح)',0,40,0,'‰')}<div class="dynamic-explanation" id="oxygen-explanation">ذوبانية الأكسجين في الماء تقل عمومًا عندما ترتفع درجة الحرارة أو الملوحة، عند ثبات الضغط. القيمة المعروضة مؤشر نسبي توضيحي وليست قياسًا مخبريًا بوحدة mg/L.</div></div>`,
+    light:()=>`${labStage(`<div class="light-tank"><div class="light-surface"></div><div class="light-rays" id="light-rays"><i></i><i></i><i></i></div><div class="light-zone photic">Photic Zone</div><div class="light-zone aphotic">Aphotic Zone</div><div class="light-bottom"></div><span id="light-depth-label">الضوء متاح قرب السطح</span></div>`)}<div class="lab-controls">${slider('depth-light','العمق',0,200,20,' m') }<div class="choice-row"><button class="choice-btn active" data-light="blue">ضوء أزرق</button><button class="choice-btn" data-light="red">ضوء أحمر</button><button class="choice-btn" data-light="green">ضوء أخضر</button></div><div class="dynamic-explanation" id="light-explanation">تُمتص الأطوال الموجية المختلفة بمعدلات مختلفة؛ غالبًا ينفذ الضوء الأزرق إلى أعماق أكبر من الأحمر في مياه صافية. تقل شدة الضوء مع العمق.</div></div>`,
+    pressure:()=>`${labStage(`<div class="pressure-ocean"><div class="pressure-surface">سطح البحر</div><div class="pressure-diver" id="pressure-diver">◉<small>غواص</small></div><div class="pressure-depth-mark">↓ العمق</div><div class="pressure-bubble">ضغط الماء يزداد لأسفل</div></div><div class="pressure-readings"><div><b id="pressure-atm">1.0</b><span>ضغط جوي تقريبي</span></div><div><b id="pressure-kpa">101</b><span>kPa تقريبًا</span></div></div>`)}<div class="lab-controls">${slider('depth-pressure','العمق تحت السطح',0,100,0,' m') }<div class="dynamic-explanation" id="pressure-explanation">يزداد الضغط الكلي مع العمق؛ كقاعدة تعليمية تقريبية يضيف كل 10 أمتار من ماء البحر نحو ضغط جوي واحد فوق ضغط الهواء عند السطح.</div></div>`,
+    foodweb:()=>`${labStage(`<div class="foodweb-scene"><div class="food-node producer">عوالق نباتية</div><div class="food-arrow">↓</div><div class="food-node primary">أسماك صغيرة</div><div class="food-arrow">↓</div><div class="food-node predator">أسماك مفترسة</div><div class="food-node decomposer">محللات ↺</div></div>`)}<div class="lab-controls">${slider('fishing-pressure','ضغط الصيد (مؤشر افتراضي)',0,100,20,'%')}<div class="foodweb-status" id="foodweb-status">ضغط منخفض نسبيًا: الشبكة قادرة على تعويض جزء من الفقد مع توافر الموائل والغذاء.</div><p class="small-note">هذا نموذج مفاهيمي يوضح اتجاه التأثير، وليس توقعًا عدديًا لأعداد الأسماك.</p></div>`,
+    layers:()=>`${labStage(`<div class="layers-interactive"><div class="layer-stack"><button data-layer="troposphere" class="atm-layer troposphere selected">Troposphere</button><button data-layer="stratosphere" class="atm-layer stratosphere">Stratosphere</button><button data-layer="mesosphere" class="atm-layer mesosphere">Mesosphere</button><button data-layer="thermosphere" class="atm-layer thermosphere">Thermosphere</button><button data-layer="exosphere" class="atm-layer exosphere">Exosphere</button><div class="planet-label">EARTH</div></div><div class="layer-info" id="layer-info"><b>Troposphere — التروبوسفير</b><p>أدنى طبقات الغلاف الجوي، تحدث فيها معظم ظواهر الطقس.</p><small>من سطح الأرض إلى نحو 8–18 km.</small></div></div>`)}<div class="lab-controls"><p class="small-note">اضغط على أي طبقة في الرسم لاستكشافها. الارتفاعات تقريبية وتتغير الحدود حسب الموقع والظروف.</p></div>`,
+    ozone:()=>`${labStage(`<div class="ozone-lab"><div class="ozone-molecule" id="ozone-molecules"><span>O₂</span><i>+</i><span>hν</span></div><div class="ozone-reaction" id="ozone-reaction">O₂ + hν → 2O</div><div class="ozone-status" id="ozone-status">الخطوة 1 من 3</div></div>`)}<div class="lab-controls"><div class="lab-button-row"><button class="btn-secondary" id="ozone-prev">السابق</button><button class="btn-primary" id="ozone-next">نفّذ الخطوة التالية</button><button class="btn-secondary" id="ozone-reset">إعادة</button></div><div class="dynamic-explanation" id="ozone-explanation">يمتص جزيء O₂ فوتونًا من الأشعة فوق البنفسجية المناسبة، فيتفكك إلى ذرتين O منفصلتين.</div></div>`,
+    wind:()=>`${labStage(`<div class="wind-scene"><div class="pressure-zone high-pressure"><b>H</b><span>ضغط مرتفع</span></div><div class="wind-arrows" id="wind-arrows">→ → → → →</div><div class="pressure-zone low-pressure"><b>L</b><span>ضغط منخفض</span></div><div class="wind-speed-label" id="wind-speed-label">تدرج ضغط متوسط</div></div>`)}<div class="lab-controls">${slider('pressure-difference','فرق الضغط (مؤشر)',0,100,50,'%')}<div class="dynamic-explanation" id="wind-explanation">تؤثر قوة تدرج الضغط في حركة الهواء من الضغط الأعلى نحو الضغط الأقل. اتجاه الرياح الفعلي يتأثر أيضًا بدوران الأرض والاحتكاك والتضاريس.</div></div>`,
+    humidity:()=>`${labStage(`<div class="humidity-cloud">☁<span id="humidity-percent">50%</span><small>الرطوبة النسبية</small></div><div class="humidity-person">♧<span id="humidity-condition">تبخر متوسط</span></div>`)}<div class="lab-controls">${slider('humidity-vapour','كمية بخار الماء (مؤشر)',0,100,50,'%')}${slider('humidity-temp','درجة حرارة الهواء',5,40,25,'°C')}<div class="dynamic-explanation" id="humidity-explanation">الرطوبة النسبية تقارن بخار الماء الفعلي بكمية الإشباع عند درجة الحرارة نفسها. تسخين الهواء دون إضافة بخار ماء يخفض الرطوبة النسبية عادةً.</div></div>`,
+    greenhouse:()=>`${labStage(`<div class="greenhouse-stage"><div class="gh-sun-large">☀</div><div class="gh-planet">🌍</div><div class="gh-atmosphere"></div><div class="gh-photons" id="gh-photons"><span>↓</span><span>↑</span><span>↘</span></div><div class="gh-label">طاقة داخلة • أشعة تحت حمراء خارجة • امتصاص وإعادة إصدار</div></div>`)}<div class="lab-controls">${slider('gh-gases','كمية غازات الدفيئة (مؤشر)',0,100,40,'%')}<div class="dynamic-explanation" id="gh-explanation">غازات الدفيئة تمتص أطوالًا موجية من الأشعة تحت الحمراء وتعيد إصدارها. هذا نموذج توضيحي لفكرة التأثير، ولا يحسب درجة حرارة الأرض الحقيقية.</div></div>`,
+    acidrain:()=>`${labStage(`<div class="acid-stage"><div class="factory-smoke">🏭<span>SO₂ • NOx</span></div><div class="acid-cloud">☁<small>تفاعلات في الجو</small></div><div class="acid-drops">↓ ↓ ↓</div><div class="acid-lake">≈ ماء يتغير pH ≈</div><div class="acid-ph" id="acid-ph">pH: يتجه للانخفاض</div></div>`)}<div class="lab-controls">${slider('acid-emissions','انبعاثات SOx وNOx (مؤشر)',0,100,50,'%')}<div class="dynamic-explanation" id="acid-explanation">تتحول أكاسيد الكبريت والنيتروجين في الجو إلى أحماض مثل H₂SO₄ وHNO₃. يوضح المشهد اتجاه التأثير فقط ولا يتنبأ بقيمة pH الفعلية في بحيرة حقيقية.</div></div>`,
+    control:()=>`${labStage(`<div class="control-stage"><div class="factory-pipe">غازات مداخن<div class="pollutant-cloud">SO₂ • CO • NOx</div></div><div class="control-unit">وحدة معالجة</div><div class="clean-pipe">هواء أنظف<div class="clean-cloud">✓</div></div></div>`)}<div class="lab-controls"><div class="choice-row"><button class="choice-btn active" data-control="scrubber">غاسل الغازات</button><button class="choice-btn" data-control="catalyst">المحول الحفاز</button></div><div class="dynamic-explanation" id="control-explanation">غاسل الغازات Scrubber يعالج بعض ملوثات المداخن، ومنها SO₂. المحول الحفاز Catalytic Converter يعالج ملوثات معينة في عادم المركبات مثل CO وNOx والهيدروكربونات.</div></div>`
+  };
+
+  function renderLab(id){
+    const lab=labById(id)||labs[0];if(!lab)return;state.labId=lab.id;
+    $('#lab-reader').innerHTML=labHeader(lab)+(labTemplates[lab.kind]?labTemplates[lab.kind]():labTemplates.distribution())+labFooter(lab);
+    $$('.lab-list-item').forEach(b=>b.classList.toggle('selected',b.dataset.openLab===lab.id));
+    wireLab(lab);
+  }
+  function setOutput(id,value){const out=$('#'+id+'-out');if(out)out.textContent=value;}
+  function wireLab(lab){
+    const on=(id,fn)=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>fn(el.value));};
+    const click=(id,fn)=>{const el=$('#'+id);if(el)el.addEventListener('click',fn);};
+    if(lab.kind==='distribution'){
+      on('fresh-share',v=>{v=Number(v);setOutput('fresh-share',v.toFixed(1)+'%');$('#salt-share').textContent=(100-v).toFixed(1)+'%';$('#fresh-share-label').textContent=v.toFixed(1)+'%';$('#salt-bar').style.width=(100-v)+'%';$('#fresh-bar').style.width=v+'%';$('.dist-big strong').textContent=(100-v).toFixed(1)+'%';$('.dist-big.fresh strong').textContent=v.toFixed(1)+'%';});
+    }
+    if(lab.kind==='water-cycle'){
+      const data={evap:['Evaporation — التبخر','تكتسب جزيئات الماء طاقة وتتحول من الحالة السائلة إلى بخار يصعد إلى الغلاف الجوي. الطاقة الشمسية هي المصدر الرئيسي للتبخر الطبيعي.'],cond:['Condensation — التكاثف','يبرد بخار الماء أو يصل إلى التشبع، فيتحول إلى قطرات ماء صغيرة أو بلورات جليد مكونًا السحب والضباب.'],precip:['Precipitation — الهطول','عندما تكبر قطرات الماء أو بلورات الجليد بما يكفي تسقط إلى سطح الأرض في صورة مطر أو ثلج أو برد بحسب الظروف.'],runoff:['Runoff & Infiltration — الجريان والتسرب','قد يجري الماء فوق السطح إلى الأنهار والبحار، وقد يتسرب إلى التربة ويغذي المياه الجوفية.'],trans:['Transpiration — النتح','تفقد النباتات بخار الماء عبر الثغور، وينتقل إلى الغلاف الجوي.']};
+      $$('[data-cycle]').forEach(b=>b.addEventListener('click',()=>{$$('[data-cycle]').forEach(x=>x.classList.toggle('active',x===b));const d=data[b.dataset.cycle];$('#cycle-explanation').innerHTML=`<b>${d[0]}</b><p>${d[1]}</p>`;$('.cycle-scene').dataset.stage=b.dataset.cycle;}));
+    }
+    if(lab.kind==='molecule'){
+      $$('[data-mol]').forEach(b=>b.addEventListener('click',()=>{$$('[data-mol]').forEach(x=>x.classList.toggle('active',x===b));const mode=b.dataset.mol;$('.big-molecule').className='big-molecule show-'+mode;const texts={charges:'الأكسجين أعلى سالبية كهربية من الهيدروجين؛ لذلك يجذب إلكترونات الرابطة نحوه نسبيًا، فيحمل شحنة جزئية سالبة δ− بينما يحمل الهيدروجين شحنة جزئية موجبة δ+.',bonds:'الخطوط الصلبة تمثل رابطتين تساهميتين قطبيتين O–H داخل الجزيء. تتشارك الذرات إلكترونات في كل رابطة.',shape:'جزيء الماء ليس خطيًا؛ بل شكله منحني بسبب ترتيب أزواج الإلكترونات حول ذرة الأكسجين، وزاوية H–O–H تقارب 104.5°.'};$('#molecule-explanation').textContent=texts[mode];}));
+    }
+    if(lab.kind==='hydrogen')click('toggle-hbond',()=>{$('.hydrogen-stage').classList.toggle('hide-bond');$('#hbond-explanation').textContent=$('.hydrogen-stage').classList.contains('hide-bond')?'تم إخفاء التجاذب بين الجزيئين. الروابط التساهمية داخل كل جزيء ما زالت موجودة.':'الرابطة الهيدروجينية تجاذب بين جزيئات الماء؛ وهي أضعف من الرابطة التساهمية O–H داخل الجزيء، لكنها تؤثر في الخواص الجماعية للماء.';});
+    if(lab.kind==='dissolving')click('dissolve-step',()=>{$('.dissolve-beaker').classList.toggle('dissolved');$('#dissolve-explanation').textContent=$('.dissolve-beaker').classList.contains('dissolved')?'انفصلت الأيونات وانتشرت في الماء. يحيط الطرف السالب جزئيًا من جزيئات الماء بأيون Na⁺، وتتجه ذرات الهيدروجين ذات الشحنة الجزئية الموجبة نحو Cl⁻.':'في البلورة الأيونية تتجاذب أيونات Na⁺ وCl⁻. جزيئات الماء القطبية يمكنها إحاطة الأيونات والمساعدة على فصلها.';});
+    if(lab.kind==='ionization')click('ionize-step',()=>{$('.ionization-reaction').classList.toggle('ionized');$('#ionize-explanation').textContent=$('.ionization-reaction').classList.contains('ionized')?'انتقل بروتون H⁺ من جزيء ماء إلى الآخر؛ الناتج H₃O⁺ وOH⁻. في الماء النقي يتساوى تركيز الأيونين عند الاتزان.':'التأين الذاتي للماء عملية اتزان ديناميكي: بعض جزيئات الماء تتأين بينما تتحد أيونات مرة أخرى.';});
+    if(lab.kind==='density')on('water-temp',v=>{v=Number(v);setOutput('water-temp',v+'°C');let d;if(v<0)d=0.917;else{const t=v;d=(1-((t+288.9414)/(508929.2*(t+68.12963)))*Math.pow(t-3.9863,2));}$('#density-value').textContent=d.toFixed(5);$('#density-ice').style.transform=`translateY(${v<0?18:0}px)`;$('#density-explanation').textContent=v===4?'قرب 4°C تبلغ كثافة الماء النقي قيمتها العظمى تقريبًا.':v<0?'عند التجمد تتكون بنية بلورية مفتوحة نسبيًا، فتقل كثافة الجليد ويطفو فوق الماء السائل.':v>4?'بعد 4°C تقل كثافة الماء تدريجيًا مع ارتفاع الحرارة في هذا النطاق.':'عند درجات أقل من 4°C وحتى التجمد تقل كثافة الماء تدريجيًا؛ وهذا سلوك غير معتاد للماء.';});
+    if(lab.kind==='hydrometer')on('liquid-density',v=>{v=Number(v);setOutput('liquid-density',v.toFixed(2));$('#hydro-reading').textContent=v.toFixed(2);$('#hydrometer-stick').style.top=(28+(1.3-v)*80)+'px';$('#hydrometer-explanation').textContent=v>1?'السائل أكثر كثافة؛ يطفو المقياس أعلى ويغمر جزء أقل منه.':v<1?'السائل أقل كثافة؛ يغوص المقياس أكثر حتى يزيح حجمًا أكبر يوازن وزنه.':'عند الكثافة المرجعية للماء في هذا النموذج يطفو المقياس عند مستوى متوسط.';});
+    if(lab.kind==='specific-heat')on('heat-energy',v=>{v=Number(v);setOutput('heat-energy',v.toLocaleString()+' J');const water=v/(0.5*4200),sand=v/(0.5*830);$('#water-rise').textContent='+'+water.toFixed(1)+'°C';$('#sand-rise').textContent='+'+sand.toFixed(1)+'°C';$('#water-thermo').style.height=Math.min(92,water*5)+'%';$('#sand-thermo').style.height=Math.min(92,sand*5)+'%';$('#heat-explanation').textContent=`للماء: ΔT = Q/(mc) = ${v}/(0.5×4200) = ${water.toFixed(2)}°C. للرمل: ΔT ≈ ${v}/(0.5×830) = ${sand.toFixed(2)}°C. لذلك يسخن الرمل أكثر لنفس الطاقة والكتلة في هذا المثال.`;});
+    if(lab.kind==='heat-transfer')$$('[data-transfer]').forEach(b=>b.addEventListener('click',()=>{const type=b.dataset.transfer;$$('[data-transfer]').forEach(x=>x.classList.toggle('active',x===b));$('#transfer-scene').dataset.type=type;const text={radiation:['Energy travels as electromagnetic waves','الإشعاع ينقل الطاقة بموجات كهرومغناطيسية، ولا يحتاج إلى وسط مادي؛ لذلك تنتقل طاقة الشمس عبر الفضاء.'],conduction:['Energy moves through contact','التوصيل انتقال للطاقة عبر تلامس الجسيمات المتجاورة دون انتقال كلي للمادة.'],convection:['Moving fluid carries energy','الحمل الحراري يحدث عندما تتحرك أجزاء السائل أو الغاز بسبب اختلاف الكثافة الناتج غالبًا عن اختلاف الحرارة.']};$('#transfer-label').textContent=text[type][0];$('#transfer-explanation').textContent=text[type][1];}));
+    if(lab.kind==='osmosis'){
+      const update=()=>{const a=Number($('#osm-a').value),b=Number($('#osm-b').value);setOutput('osm-a',a+' وحدات');setOutput('osm-b',b+' وحدات');$('#dots-a').textContent='● '.repeat(Math.max(1,Math.round(a/2)+1));$('#dots-b').textContent='● '.repeat(Math.max(1,Math.round(b/2)+1));const arrow=$('#osmosis-arrow');if(a<b){arrow.textContent='H₂O →';$('#osmosis-explanation').textContent='الماء ينتقل من A (مذاب أقل) إلى B (مذاب أعلى) عبر الغشاء شبه المنفذ.';}else if(a>b){arrow.textContent='← H₂O';$('#osmosis-explanation').textContent='الماء ينتقل من B (مذاب أقل) إلى A (مذاب أعلى) عبر الغشاء شبه المنفذ.';}else{arrow.textContent='H₂O ⇄';$('#osmosis-explanation').textContent='التركيزان متساويان في هذا النموذج؛ تستمر حركة الجزيئات في الاتجاهين لكن لا يوجد انتقال صافٍ للماء.';}};on('osm-a',update);on('osm-b',update);
+    }
+    if(lab.kind==='ph')on('ph-slider',v=>{v=Number(v);setOutput('ph-slider',v.toFixed(1));$('#ph-value').textContent=v.toFixed(1);$('#ph-marker').style.left=(v/14*100)+'%';const kind=v<7?'حمضي':v>7?'قاعدي':'متعادل';$('#ph-kind').textContent=kind;$('#ph-explanation').textContent=v<7?`pH = ${v.toFixed(1)} أقل من 7؛ الوسط حمضي في النموذج. كلما قلت قيمة pH زادت الحموضة.`:v>7?`pH = ${v.toFixed(1)} أكبر من 7؛ الوسط قاعدي في النموذج. كلما ارتفعت القيمة زادت القاعدية.`:'pH = 7؛ متعادل تقريبًا عند 25°C للماء النقي.';});
+    if(lab.kind==='cell'){
+      const organelles={nucleus:['النواة','تحتوي معظم المادة الوراثية وتشارك في تنظيم أنشطة الخلية.'],mitochondria:['الميتوكوندريا','مكان رئيسي لإنتاج ATP في التنفس الخلوي الهوائي.'],ribosome:['الريبوسومات','مواقع تصنيع البروتينات بترجمة المعلومات الوراثية.'],golgi:['جهاز جولجي','يعدل بعض البروتينات والدهون ويصنفها ويغلفها للنقل.'],vacuole:['الفجوة العصارية','تخزن الماء ومواد مختلفة؛ وتكون كبيرة مركزيًا في كثير من الخلايا النباتية.'],chloroplast:['البلاستيدة الخضراء','توجد في النباتات والطحالب وتحتوي أصباغًا تمتص الضوء للبناء الضوئي.']};
+      $$('[data-organelle]').forEach(b=>b.addEventListener('click',()=>{const d=organelles[b.dataset.organelle];$('#organelle-info').innerHTML=`<b>${d[0]}</b><p>${d[1]}</p>`;$$('[data-organelle]').forEach(x=>x.classList.toggle('picked',x===b));}));
+      $$('[data-celltype]').forEach(b=>b.addEventListener('click',()=>{$$('[data-celltype]').forEach(x=>x.classList.toggle('active',x===b));$('.cell-drawing').classList.toggle('plant',b.dataset.celltype==='plant');$('#cell-explanation').textContent=b.dataset.celltype==='plant'?'الخلية النباتية تمتلك جدارًا خلويًا وبلاستيدات خضراء وفجوة عصارية كبيرة غالبًا، إضافة إلى النواة والميتوكوندريا والريبوسومات.':'الخلية الحيوانية لا تمتلك جدارًا خلويًا أو بلاستيدات خضراء، وتحتوي غشاءً بلازميًا ونواة وعضيات مثل الميتوكوندريا وجهاز جولجي.';}));
+    }
+    if(lab.kind==='fish')$$('[data-fish]').forEach(b=>b.addEventListener('click',()=>{const mode=b.dataset.fish;$$('[data-fish]').forEach(x=>x.classList.toggle('active',x===b));$('.fish-stage').dataset.kind=mode;$('#fish-environment').textContent=mode==='fresh'?'ماء عذب':'ماء البحر';$('#fish-water-arrow').textContent=mode==='fresh'?'H₂O → إلى الجسم':'H₂O ← خارج الجسم';$('#fish-salts').textContent=mode==='fresh'?'امتصاص أملاح عبر الخياشيم':'شرب ماء البحر وإخراج أملاح زائدة';$('#fish-explanation').textContent=mode==='fresh'?'في الماء العذب يميل الماء إلى الدخول إلى جسم السمكة أسموزيًا لأن سوائل جسمها أعلى تركيزًا من الوسط. تطرح السمكة بولًا مخففًا نسبيًا وتمتص الأملاح عبر الخياشيم والغذاء.':'في ماء البحر يميل الماء إلى الخروج من جسم السمكة أسموزيًا لأن الوسط أكثر تركيزًا. تشرب كثير من الأسماك البحرية الماء وتطرح الأملاح الزائدة عبر الخياشيم وتنتج بولًا أقل حجمًا.';}));
+    if(lab.kind==='oxygen'){
+      const update=()=>{const t=Number($('#oxygen-temp').value),s=Number($('#oxygen-salt').value);setOutput('oxygen-temp',t+'°C');setOutput('oxygen-salt',s+'‰');const index=Math.max(0.1,11.5-0.17*t-0.055*s);$('#oxygen-reading').textContent=index.toFixed(1);$('#oxygen-bubbles').style.opacity=Math.max(.12,index/11.5);$('#oxygen-explanation').textContent=`عند ${t}°C وملوحة مؤشرها ${s}‰، يوضح النموذج أن الأكسجين الذائب يميل إلى الانخفاض مع زيادة الحرارة والملوحة. الرقم مؤشر نسبي للتوضيح وليس قياسًا فعليًا.`;};on('oxygen-temp',update);on('oxygen-salt',update);
+    }
+    if(lab.kind==='light'){
+      let color='blue';$$('[data-light]').forEach(b=>b.addEventListener('click',()=>{color=b.dataset.light;$$('[data-light]').forEach(x=>x.classList.toggle('active',x===b));update();}));
+      const update=()=>{const d=Number($('#depth-light').value);setOutput('depth-light',d+' m');$('.light-rays').dataset.color=color;$('.light-rays').style.opacity=Math.max(.04,Math.exp(-d/(color==='blue'?90:color==='green'?65:35)));$('#light-depth-label').textContent=d<30?'ضوء قوي نسبيًا في هذا النموذج':d<100?'الضوء يتناقص مع العمق':'ضوء ضعيف جدًا في هذا النموذج';$('#light-explanation').textContent=`عند عمق ${d} m يقل الضوء الواصل عن السطح. اللون ${color==='blue'?'الأزرق':color==='green'?'الأخضر':'الأحمر'} له معدل امتصاص مختلف في النموذج؛ في المياه الصافية ينفذ الأزرق عادة إلى عمق أكبر من الأحمر.`;};on('depth-light',update);
+    }
+    if(lab.kind==='pressure')on('depth-pressure',v=>{v=Number(v);setOutput('depth-pressure',v+' m');const atm=1+v/10,kpa=101.3+9.8*v;$('#pressure-atm').textContent=atm.toFixed(1);$('#pressure-kpa').textContent=kpa.toFixed(0);$('#pressure-diver').style.top=(20+v/100*65)+'%';$('#pressure-explanation').textContent=`عند ${v} m: الضغط الكلي التقريبي = 1 + ${v}/10 = ${atm.toFixed(1)} atm، أي نحو ${kpa.toFixed(0)} kPa. هذا تقريب لماء البحر مع اعتبار الكثافة ثابتة تقريبًا.`;});
+    if(lab.kind==='foodweb')on('fishing-pressure',v=>{v=Number(v);setOutput('fishing-pressure',v+'%');$('.foodweb-scene').dataset.pressure=v>70?'high':v>35?'mid':'low';$('#foodweb-status').textContent=v>70?'ضغط صيد مرتفع في النموذج: تقل الأسماك الكبيرة وقد يتغير عدد الأسماك الصغيرة والعوالق، فتتغير علاقات الشبكة.':v>35?'ضغط متوسط: يبدأ التأثير في مستويات معينة وقد تتغير وفرة المفترسات والفرائس.':'ضغط منخفض نسبيًا: الشبكة قادرة على تعويض جزء من الفقد مع توافر الموائل والغذاء.';});
+    if(lab.kind==='layers'){
+      const data={troposphere:['Troposphere — التروبوسفير','أدنى طبقات الغلاف الجوي، تحدث فيها معظم ظواهر الطقس ومعظم السحب.','من سطح الأرض إلى نحو 8–18 km.'],stratosphere:['Stratosphere — الستراتوسفير','توجد بها طبقة الأوزون التي تمتص معظم الأشعة فوق البنفسجية الضارة.','نحو 12–50 km.'],mesosphere:['Mesosphere — الميزوسفير','يحترق أو يتوهج فيها معظم ما نراه من الشهب.','نحو 50–85 km.'],thermosphere:['Thermosphere — الثرموسفير','ترتفع فيها درجة الحرارة، وتحدث في أجزائها العليا ظواهر الشفق القطبي.','نحو 85–500/600 km تقريبًا.'],exosphere:['Exosphere — الإكسوسفير','الطبقة الخارجية شديدة التخلخل والانتقال التدريجي إلى الفضاء.','تبدأ تقريبًا من مئات الكيلومترات العليا.']};
+      $$('[data-layer]').forEach(b=>b.addEventListener('click',()=>{const d=data[b.dataset.layer];$$('[data-layer]').forEach(x=>x.classList.toggle('selected',x===b));$('#layer-info').innerHTML=`<b>${d[0]}</b><p>${d[1]}</p><small>${d[2]}</small>`;}));
+    }
+    if(lab.kind==='ozone'){
+      let step=0;const stages=[['O₂ + hν → 2O','الخطوة 1: يمتص جزيء الأكسجين فوتونًا مناسبًا فيتفكك إلى ذرتين O منفصلتين.'],['O + O₂ + M → O₃ + M','الخطوة 2: تتحد ذرة O مع جزيء O₂. يساعد الجزيء الثالث M على حمل الطاقة الزائدة واستقرار الأوزون.'],['O₃ + hν → O₂ + O','الخطوة 3: يمتص الأوزون الأشعة فوق البنفسجية ويمكن أن يتحلل إلى أكسجين جزيئي وذرة أكسجين؛ لذلك توجد دورة تكوين وتحلل.']];
+      const render=()=>{$('#ozone-reaction').textContent=stages[step][0];$('#ozone-explanation').textContent=stages[step][1];$('#ozone-status').textContent=`الخطوة ${step+1} من 3`;$('#ozone-molecules').dataset.step=step;};
+      click('ozone-next',()=>{step=(step+1)%3;render();});click('ozone-prev',()=>{step=(step+2)%3;render();});click('ozone-reset',()=>{step=0;render();});
+    }
+    if(lab.kind==='wind')on('pressure-difference',v=>{v=Number(v);setOutput('pressure-difference',v+'%');$('#wind-arrows').style.letterSpacing=(Math.max(0.3,v/20))+'rem';$('#wind-speed-label').textContent=v<25?'تدرج ضغط ضعيف':v<65?'تدرج ضغط متوسط':'تدرج ضغط كبير';$('#wind-explanation').textContent=`كلما زاد فرق الضغط عبر مسافة متشابهة زادت قوة تدرج الضغط غالبًا. هذا يشير إلى إمكانية رياح أقوى عند ثبات العوامل الأخرى، لكن السرعة الفعلية تتأثر بالاحتكاك ودوران الأرض والتضاريس.`;});
+    if(lab.kind==='humidity'){
+      const saturation=t=>Math.max(1,Math.exp(17.625*t/(243.04+t)));const update=()=>{const vap=Number($('#humidity-vapour').value),t=Number($('#humidity-temp').value);setOutput('humidity-vapour',vap+'%');setOutput('humidity-temp',t+'°C');const rh=Math.min(100,Math.round(vap/100*saturation(25)/saturation(t)*100));$('#humidity-percent').textContent=rh+'%';$('#humidity-condition').textContent=rh>75?'تبخر العرق أبطأ غالبًا':rh<30?'تبخر أسرع وفقد ماء أكبر':'تبخر متوسط';$('#humidity-explanation').textContent=`عند مؤشر بخار ${vap}% ودرجة ${t}°C، الرطوبة النسبية التقريبية في هذا النموذج ${rh}%. عند زيادة الحرارة دون إضافة بخار ماء تنخفض الرطوبة النسبية غالبًا لأن سعة الهواء لبخار الماء ترتفع.`;};on('humidity-vapour',update);on('humidity-temp',update);
+    }
+    if(lab.kind==='greenhouse')on('gh-gases',v=>{v=Number(v);setOutput('gh-gases',v+'%');$('#gh-photons').style.opacity=(0.35+v/150).toString();$('#gh-explanation').textContent=`عند مؤشر ${v}% لغازات الدفيئة، يزيد الجزء الممتص والمعاد إصداره من الأشعة تحت الحمراء في الرسم التوضيحي. هذا ليس قياسًا لتركيز حقيقي ولا توقعًا رقميًا لدرجة حرارة الكوكب.`;});
+    if(lab.kind==='acidrain')on('acid-emissions',v=>{v=Number(v);setOutput('acid-emissions',v+'%');$('#acid-ph').textContent=v>65?'انخفاض pH محتمل أكبر':v>30?'تحمّض محتمل':'تأثير أقل في النموذج';$('#acid-explanation').textContent=`كلما ارتفعت انبعاثات SOx وNOx في النموذج زادت كمية المواد التي يمكن أن تتحول إلى أحماض وتترسب. يتحدد pH الفعلي بكمية الترسيب وقدرة الماء والتربة على معادلة الحمض وعوامل أخرى.`;});
+    if(lab.kind==='control')$$('[data-control]').forEach(b=>b.addEventListener('click',()=>{$$('[data-control]').forEach(x=>x.classList.toggle('active',x===b));$('.control-stage').dataset.mode=b.dataset.control;$('#control-explanation').textContent=b.dataset.control==='scrubber'?'غاسل الغازات Scrubber يلامس غازات المداخن بسائل أو مادة ماصة لإزالة ملوثات محددة، مثل جزء من SO₂.':'المحول الحفاز Catalytic Converter يستخدم مواد حفازة لتسريع تفاعلات تحول CO وNOx وبعض الهيدروكربونات في العادم إلى نواتج أقل ضررًا.';}));
   }
 
-  function renderGlossary(filter = '') {
-    const term = filter.trim().toLowerCase();
-    const entries = glossary.filter(item => !term || item.join(' ').toLowerCase().includes(term));
-    $('#glossary-count').textContent = `${entries.length} مصطلح`;
-    $('#glossary-grid').innerHTML = entries.map((item, index) => `<button class="glossary-card" data-glossary-index="${glossary.indexOf(item)}"><strong>${escapeHTML(item[0])}</strong><span>${escapeHTML(item[1])}</span><small>${escapeHTML(item[2])}</small></button>`).join('') || '<p class="empty-state">لا توجد نتائج مطابقة. جرّب كتابة المصطلح بالإنجليزية أو العربية.</p>';
+  function renderQuizSetup(){
+    const lessonSelect=$('#quiz-lesson');if(!lessonSelect)return;
+    const unit=$('#quiz-unit').value;
+    const list=lessons.filter(l=>unit==='all'||String(l.unit)===unit);
+    lessonSelect.innerHTML='<option value="all">كل دروس الوحدة</option>'+list.map(l=>`<option value="${l.id}">${String(l.id).padStart(2,'0')} — ${esc(l.title)}</option>`).join('');
+    $('#question-total').textContent=allQuestions().length+' سؤال';
+  }
+  function beginQuiz(){
+    const unit=$('#quiz-unit').value,lesson=$('#quiz-lesson').value,count=Number($('#quiz-count-select').value);
+    let pool=allQuestions().filter(q=>(unit==='all'||String(lessonById(q.lessonId).unit)===unit)&&(lesson==='all'||String(q.lessonId)===lesson));
+    if(!pool.length){toast('لا توجد أسئلة في هذا الاختيار');return;}
+    for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+    state.quizQuestions=pool.slice(0,Math.min(count,pool.length));state.quizIndex=0;state.quizScore=0;state.quizAnswers=[];state.quizDone=false;
+    $('#quiz-setup').hidden=true;$('#quiz-session').hidden=false;renderQuestion();
+  }
+  function renderQuestion(){
+    const q=state.quizQuestions[state.quizIndex];if(!q)return finishQuiz();
+    const n=state.quizIndex+1,total=state.quizQuestions.length;
+    $('#quiz-session').innerHTML=`<div class="quiz-progress-line"><span>السؤال ${n} من ${total}</span><b>${Math.round((n-1)/total*100)}%</b></div><div class="quiz-progress"><i style="width:${(n-1)/total*100}%"></i></div><article class="quiz-question-card"><div class="question-meta"><span>LESSON ${String(q.lessonId).padStart(2,'0')}</span><span>${esc(q.lessonTitle)}</span></div><h2>${rich(q.q)}</h2><div class="answer-options">${q.o.map((o,i)=>`<button class="answer-option" data-answer="${i}"><i>${String.fromCharCode(65+i)}</i><span>${rich(o)}</span></button>`).join('')}</div><div class="answer-feedback" id="answer-feedback" hidden></div><div class="quiz-action-row"><button class="btn-primary" id="next-question" disabled>${n===total?'عرض النتيجة':'السؤال التالي'} ←</button><button class="text-link" id="exit-quiz">إنهاء الاختبار</button></div></article>`;
+    $$('[data-answer]').forEach(b=>b.addEventListener('click',()=>answerQuestion(Number(b.dataset.answer),q)));
+    $('#next-question').addEventListener('click',()=>{state.quizIndex++;renderQuestion();});$('#exit-quiz').addEventListener('click',()=>{if(confirm('هل تريد إنهاء الاختبار وعرض نتيجتك الحالية؟'))finishQuiz();});
+  }
+  function answerQuestion(choice,q){
+    if($('#answer-feedback').hidden===false)return;
+    const correct=choice===Number(q.a);if(correct)state.quizScore++;
+    state.quizAnswers.push({choice,correct});
+    $$('[data-answer]').forEach((b,i)=>{b.disabled=true;if(i===Number(q.a))b.classList.add('correct');if(i===choice&&!correct)b.classList.add('incorrect');});
+    const fb=$('#answer-feedback');fb.hidden=false;fb.className='answer-feedback '+(correct?'right':'wrong');fb.innerHTML=`<b>${correct?'إجابة صحيحة ✓':'مش هي دي الإجابة ✕'}</b><p>${rich(q.e||'راجع شرح الدرس ثم حاول مرة أخرى.')}</p>`;$('#next-question').disabled=false;
+  }
+  function finishQuiz(){
+    const total=state.quizAnswers.length,score=state.quizScore,pct=total?Math.round(score/total*100):0;
+    $('#quiz-session').innerHTML=`<div class="quiz-result"><div class="result-ring" style="--score:${pct}%"><div><strong>${pct}%</strong><small>نتيجتك</small></div></div><h2>${pct>=80?'ممتاز! فهمك قوي':pct>=60?'أداء جيد، راجع النقاط الصعبة':'محتاج مراجعة وتدريب إضافي'}</h2><p>أجبت عن ${score} إجابة صحيحة من ${total} سؤال.</p><div class="result-stats"><span><b>${score}</b> صحيحة</span><span><b>${total-score}</b> غير صحيحة</span><span><b>${total}</b> إجمالي</span></div><div class="lab-button-row"><button class="btn-primary" id="retry-quiz">اختبار جديد</button><button class="btn-secondary" id="back-quiz">إعدادات الأسئلة</button></div></div>`;
+    $('#retry-quiz').addEventListener('click',beginQuiz);$('#back-quiz').addEventListener('click',()=>{$('#quiz-session').hidden=true;$('#quiz-setup').hidden=false;});
+  }
+  function renderGlossary(filter=''){
+    const term=filter.trim().toLowerCase();const items=glossary.filter(g=>`${g.en} ${g.ar} ${g.definition}`.toLowerCase().includes(term));
+    $('#glossary-count').textContent=items.length+' مصطلح';$('#glossary-grid').innerHTML=items.map(g=>`<button class="glossary-card" data-term="${attr(g.en)}"><b>${esc(g.en)}</b><strong>${esc(g.ar)}</strong><small>${esc(g.definition)}</small></button>`).join('')||'<div class="empty-state">لا توجد مصطلحات مطابقة.</div>';
+  }
+  function openTerm(name){
+    const key=String(name).toLowerCase();const term=glossary.find(g=>g.en.toLowerCase()===key)||glossary.find(g=>g.ar===name)||glossary.find(g=>g.en.toLowerCase().includes(key));
+    if(!term){toast('المصطلح غير موجود في القاموس بعد');return;}
+    $('#term-en').textContent=term.en;$('#term-ar').textContent=term.ar;$('#term-description').textContent=term.definition;$('#term-example').textContent=term.example?`مثال: ${term.example}`:'';$('#term-modal').showModal();
+  }
+  function renderMap(){
+    $('#curriculum-grid').innerHTML=[1,2].map(unit=>`<section class="map-unit"><header><span>UNIT 0${unit}</span><b>${unit===1?'النظام البيئي المائي':'الغلاف الجوي'}</b><small>${unit===1?'10 دروس':'4 دروس'}</small></header>${lessons.filter(l=>l.unit===unit).map(l=>`<button class="map-lesson" data-lesson="${l.id}"><i>${String(l.id).padStart(2,'0')}</i><span><b>${esc(l.title)}</b><small>${esc(l.en)}</small></span><em>${state.completed.has(l.id)?'✓':'↗'}</em></button>`).join('')}</section>`).join('');
+    $('#reference-links').innerHTML=refs.map(r=>`<a href="${attr(r.url)}" target="_blank" rel="noopener"><b>${esc(r.name)}</b><small>${esc(r.note)}</small><i>↗</i></a>`).join('');
+  }
+  function performSearch(value){
+    const v=value.trim().toLowerCase();if(!v)return;
+    const match=lessons.find(l=>`${l.title} ${l.en} ${l.intro} ${l.sections.map(s=>s.title+' '+(s.paragraphs||[]).join(' ')).join(' ')}`.toLowerCase().includes(v));
+    const term=glossary.find(g=>`${g.en} ${g.ar} ${g.definition}`.toLowerCase().includes(v));
+    const lab=labs.find(l=>`${l.title} ${l.en} ${l.desc}`.toLowerCase().includes(v));
+    if(match){switchView('lessons');renderLessonBrowser(v);renderLesson(match.id);return;}
+    if(term){switchView('glossary');renderGlossary(value);return;}
+    if(lab){switchView('lab');renderLab(lab.id);return;}
+    toast('لم أجد نتيجة مطابقة. جرّب كلمة أخرى.');
   }
 
-  function openTerm(term) {
-    const entry = findTerm(term);
-    if (!entry) { showToast('المصطلح غير موجود في القاموس حاليًا.'); return; }
-    $('#dialog-term').textContent = entry[0];
-    $('#dialog-ar').textContent = entry[1];
-    $('#dialog-desc').textContent = entry[2];
-    $('#dialog-example').textContent = `مثال: ${entry[3]}`;
-    $('#term-dialog').showModal();
-  }
-
-  function renderQuiz() {
-    const select = $('#quiz-lesson-select');
-    if (!select.dataset.ready) {
-      select.innerHTML = '<option value="all">كل المنهج</option>' + lessons.map(lesson => `<option value="${lesson.id}">الدرس ${lesson.id}: ${escapeHTML(lesson.title)}</option>`).join('');
-      select.dataset.ready = '1';
-    }
-    let questions = [];
-    const filter = select.value;
-    lessons.forEach(lesson => {
-      if (filter === 'all' || Number(filter) === lesson.id) {
-        lesson.quiz.forEach((question, index) => questions.push({ ...question, lessonId:lesson.id, lessonTitle:lesson.title, key:`${lesson.id}-${index}` }));
-      }
-    });
-    if (quizOrder.length && filter === 'all') {
-      const rank = new Map(quizOrder.map((key,index) => [key,index]));
-      questions.sort((a,b) => (rank.get(a.key) ?? 9999) - (rank.get(b.key) ?? 9999));
-    }
-    $('#quiz-count').textContent = `${questions.length} سؤالًا`;
-    $('#stat-questions').innerHTML = `${lessons.reduce((total, lesson) => total + lesson.quiz.length, 0)} <span>سؤالًا</span>`;
-    $('#quiz-area').innerHTML = questions.map((question, index) => {
-      const chosen = answered.get(question.key);
-      const hasAnswer = chosen !== undefined;
-      const correct = hasAnswer && chosen === question.a;
-      return `<article class="question-card" data-question="${question.key}">
-        <div class="question-meta"><span>${escapeHTML(question.lessonTitle)}</span><span>سؤال ${index + 1}</span></div>
-        <h3>${escapeHTML(question.q)}</h3>
-        <div class="answers">${question.o.map((option, optionIndex) => {
-          const state = hasAnswer && optionIndex === question.a ? 'correct' : hasAnswer && optionIndex === chosen ? 'wrong' : '';
-          return `<button class="answer-option ${state}" data-answer="${optionIndex}" ${hasAnswer ? 'disabled' : ''}><span class="letter">${String.fromCharCode(65 + optionIndex)}</span><span>${escapeHTML(option)}</span></button>`;
-        }).join('')}</div>
-        <div class="answer-feedback ${hasAnswer ? 'show' : ''}">${hasAnswer ? (correct ? '✓ إجابة صحيحة. ' : 'ليست الإجابة الصحيحة. ') + escapeHTML(question.e) : ''}</div>
-      </article>`;
-    }).join('');
-  }
-
-  function allQuestions() {
-    return lessons.flatMap(lesson => lesson.quiz.map((question,index) => ({ ...question, key:`${lesson.id}-${index}`, lessonId:lesson.id })));
-  }
-
-  function labTabMarkup() {
-    $('#lab-tabs').innerHTML = labs.map(lab => `<button class="lab-tab ${lab.id === activeLab ? 'active' : ''}" data-lab="${lab.id}">${escapeHTML(lab.title)}</button>`).join('');
-  }
-
-  function labHead(lab) {
-    return `<div class="lab-head"><div><h3>${escapeHTML(lab.title)}</h3><p>${escapeHTML(lab.desc)}</p></div><span class="lab-badge">SIMULATION • LESSON ${String(lab.lesson).padStart(2,'0')}</span></div>`;
-  }
-
-  function sliderControl(id,label,min,max,value,output,step='1') {
-    return `<div class="control-row"><label for="${id}"><span>${label}</span><output id="${id}-out">${output}</output></label><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"></div>`;
-  }
-
-  function labWorkspace(simulator, controls, explanation) {
-    return `<div class="lab-workspace"><div class="simulator">${simulator}</div><div class="controls-panel">${controls}<div class="lab-explain" id="lab-explain">${explanation}</div></div></div>`;
-  }
-
-  function renderLab(id = activeLab) {
-    const lab = labs.find(item => item.id === id) || labs[0];
-    if (!lab) return;
-    activeLab = lab.id;
-    labTabMarkup();
-    let simulator = '';
-    let controls = '';
-    let explanation = '';
-
-    if (lab.kind === 'water') {
-      simulator = `<div class="water-cycle-art"><div class="cycle-sun"></div><div class="cycle-cloud"></div><span class="cycle-arrow arrow-up">➜</span><span class="cycle-arrow arrow-right">➜</span><span class="cycle-arrow arrow-down">➜</span><i class="droplet"></i><i class="droplet"></i><i class="droplet"></i><div class="cycle-sea"></div></div><span class="sim-note">التبخر ↑ • التكاثف ☁ • الهطول ↓</span>`;
-      controls = sliderControl('water-temp','درجة حرارة السطح',0,40,24,'24 °C') + sliderControl('water-humidity','الرطوبة النسبية',10,100,45,'45%') + sliderControl('water-wind','سرعة حركة الهواء',0,10,4,'4 وحدات');
-      explanation = 'عندما ترتفع الحرارة يزيد معدل التبخر غالبًا. ارتفاع الرطوبة يقلل فرق بخار الماء بين السطح والهواء، والهواء المتحرك يساعد على نقل البخار بعيدًا عن السطح.';
-    }
-    if (lab.kind === 'molecule') {
-      simulator = `<div class="molecule" id="lab-molecule"><div class="bond left"></div><div class="bond right"></div><div class="atom atom-o">O</div><div class="atom atom-h left" id="hydrogen-left">H</div><div class="atom atom-h right" id="hydrogen-right">H</div><span class="charge left">δ+</span><span class="charge right">δ+</span><span class="charge" style="left:94px;top:39px">δ−</span><div class="dipole-arrow"></div><span class="sim-note">اتجاه القطبية نحو جانب الأكسجين</span></div>`;
-      controls = sliderControl('molecule-angle','زاوية H–O–H',90,120,104.5,'104.5°','0.5');
-      explanation = 'الزاوية الطبيعية لجزيء الماء تقارب 104.5°. ذرة الأكسجين تجذب الإلكترونات بقوة أكبر؛ لذلك يكون جانبها سالبًا جزئيًا، ويكون الجزيء قطبيًا.';
-    }
-    if (lab.kind === 'ozone') {
-      ozonePhase = 0;
-      simulator = `<div class="uv-rays" id="uv-rays">UV ✦ أشعة فوق بنفسجية</div><div class="ozone-atoms"><div class="oxygen-particle" id="ozone-reactant">O₂</div><span class="reaction-arrow">→</span><div class="reaction-result" id="ozone-products"><i class="oxygen-particle small">O</i><i class="oxygen-particle small">O</i></div><span class="reaction-plus">+</span><div class="reaction-result" id="ozone-final"><i class="oxygen-particle small">O₃</i></div></div><span class="sim-note" id="ozone-caption">ابدأ بتشغيل الأشعة فوق البنفسجية</span>`;
-      controls = `<div class="control-row"><label><span>المرحلة الحالية</span><output id="ozone-step">0 / 2</output></label><div class="lab-actions"><button data-lab-action="uv">1. تشغيل UV</button><button data-lab-action="form-ozone">2. تكوين O₃</button><button data-lab-action="reset-ozone">إعادة التجربة ↻</button></div></div>`;
-      explanation = 'في الخطوة الأولى يمتص O₂ فوتونًا فيتفكك إلى ذرتي أكسجين: O₂ + hν → O + O. في الخطوة الثانية تتحد ذرة O مع جزيء O₂ لتكوين O₃، ويساعد جزيء ثالث M على حمل الطاقة الزائدة.';
-    }
-    if (lab.kind === 'density') {
-      simulator = `<span class="density-readout" id="density-readout">ρ = 1000 kg/m³</span><div class="water-beaker"><div class="beaker-liquid" id="density-liquid"></div><div class="ice-cube" id="density-ice"></div><div class="beaker-label" id="density-state">H₂O • سائل</div></div><span class="sim-note">قمة كثافة الماء السائل تكون قرب 4°C</span>`;
-      controls = sliderControl('density-temp','درجة الحرارة',-5,30,4,'4 °C','1');
-      explanation = 'للماء سلوك غير معتاد: تصل كثافة الماء السائل إلى قيمة عظمى قرب 4°C. عند التجمد تتكون بنية بلورية مفتوحة، فتصبح كثافة الجليد أقل من الماء السائل ويطفو.';
-    }
-    if (lab.kind === 'osmosis') {
-      simulator = `<div class="solution-side left"></div><div class="solution-side right"></div><div class="membrane"></div><div id="osmosis-arrow" class="flow-arrow">⇢</div><span class="pressure-value" id="osmosis-label">الماء: A → B</span><span class="sim-note">الغشاء يسمح بمرور الماء ولا يسمح بمرور كل المذاب</span>`;
-      controls = sliderControl('osmosis-a','تركيز المذاب في A',0,10,2,'2 وحدات') + sliderControl('osmosis-b','تركيز المذاب في B',0,10,7,'7 وحدات');
-      explanation = 'يتحرك الماء صافيًا عبر الغشاء من الجانب الأقل تركيزًا بالمذاب إلى الجانب الأعلى تركيزًا بالمذاب. إذا تساوى التركيزان، لا يوجد اتجاه صافٍ مفضل في النموذج.';
-    }
-    if (lab.kind === 'ph') {
-      simulator = `<div class="ph-scale"><div class="ph-gradient"><span id="ph-marker" class="ph-marker" style="left:50%"></span></div><div class="ph-labels"><span>0 Acidic</span><span>7 Neutral</span><span>14 Basic</span></div><div class="ph-current" id="ph-current">7</div><div class="ph-state" id="ph-state">متعادل تقريبًا</div></div><span class="sim-note">مقياس توضيحي — لا تختبر مواد منزلية مجهولة</span>`;
-      controls = sliderControl('ph-value','قيمة pH',0,14,7,'7');
-      explanation = 'عند 25°C: أقل من 7 حمضي، 7 متعادل، أكبر من 7 قاعدي. مقياس pH لوغاريتمي؛ فرق وحدة واحدة يعني فرقًا بعشرة أضعاف في تركيز H₃O⁺.';
-    }
-    if (lab.kind === 'pressure') {
-      simulator = `<div class="pressure-depth"><div class="depth-line" style="top:25%"></div><div class="depth-line" style="top:50%"></div><div class="depth-line" style="top:75%"></div><span id="pressure-diver" class="diver" style="top:12%">◉</span><span class="pressure-value" id="pressure-value">1.0 atm تقريبًا</span></div><span class="sim-note">السطح أعلى الرسم • القاع أسفل الرسم</span>`;
-      controls = sliderControl('pressure-depth-input','العمق',0,100,0,'0 m') + '<div class="control-row"><label><span>الضغط الكلي التقريبي</span><output id="pressure-kpa">101.3 kPa</output></label></div>';
-      explanation = 'ضغط الماء يزداد بزيادة العمق: P = ρgh. عند إضافة الضغط الجوي على السطح نحصل على الضغط الكلي. في ماء البحر تزداد القيمة بنحو 1 atm تقريبًا لكل 10 m.';
-    }
-    if (lab.kind === 'gases') {
-      simulator = `<div class="water-beaker"><div class="beaker-liquid" id="gas-liquid"></div><div class="beaker-label">O₂ dissolved</div><div class="salt-particles"><i></i><i></i><i></i><i></i><i></i></div></div><div class="ph-current" id="gas-value" style="font-size:25px">9.1</div><span class="sim-note">قيمة إرشادية تقريبية للأكسجين المشبع في الماء العذب عند ضغط قريب من سطح البحر (mg/L)</span>`;
-      controls = sliderControl('gas-temp','درجة حرارة الماء',0,35,20,'20 °C','1');
-      explanation = 'في الماء العذب وعند ضغط قريب من الضغط الجوي، تقل ذوبانية الأكسجين مع ارتفاع درجة الحرارة. القيمة الفعلية تتأثر أيضًا بالملوحة والضغط والاضطراب والعمق.';
-    }
-    if (lab.kind === 'greenhouse') {
-      simulator = `<div class="greenhouse-sky"><div class="greenhouse-sun"></div><div class="heat-layer" id="greenhouse-layer"></div><div class="heat-ray ray-in"></div><div class="heat-ray ray-out" id="greenhouse-ray"></div><div class="earth-surface"></div><span class="heat-molecule" style="top:36px;right:27%">CO₂</span><span class="heat-molecule" style="top:80px;right:65%">CH₄</span></div><span class="sim-note">نموذج مفاهيمي مبسط لتوازن الطاقة</span>`;
-      controls = sliderControl('greenhouse-level','مستوى غازات الدفيئة (نسبي)',0,100,50,'50%');
-      explanation = 'غازات الدفيئة تمتص جزءًا من الأشعة تحت الحمراء المنبعثة من سطح الأرض وتعيد إصدارها. هذا نموذج تعليمي مبسط ولا يحسب درجة حرارة حقيقية أو توقعًا مناخيًا.';
-    }
-    if (lab.kind === 'layers') {
-      simulator = `<div class="layers-stack">${[['Exosphere','500+ km','#5369a4'],['Thermosphere','85–500 km','#5369a4'],['Mesosphere','50–85 km','#437f9d'],['Stratosphere','12–50 km','#328d91'],['Troposphere','0–12 km','#3b9b82']].map((row,index)=>`<div class="layer-row" style="background:${row[2]}"><b>${row[0]}</b><small>${row[1]}</small></div>`).join('')}</div><span class="sim-note">اضغط على طبقة من القائمة لاكتشاف ما يميزها.</span>`;
-      controls = `<div class="control-row"><label><span>استكشف طبقة</span><output>ATMOSPHERE</output></label><div class="layer-select-list">${[['Troposphere','تحدث فيها معظم ظواهر الطقس.'],['Stratosphere','تتركز بها طبقة الأوزون.'],['Mesosphere','تحترق فيها غالبية الشهب الصغيرة.'],['Thermosphere','تظهر فيها ظواهر الشفق القطبي.'],['Exosphere','الطبقة الخارجية المتدرجة نحو الفضاء.']].map(item=>`<button class="answer-option" data-layer="${item[0]}">${item[0]}</button>`).join('')}</div></div>`;
-      explanation = 'تختلف الطبقات بحسب تغير درجة الحرارة مع الارتفاع. الأرقام تقريبية؛ والارتفاعات والحدود تتغير مع خط العرض والفصل والنشاط الشمسي.';
-    }
-    $('#lab-stage').innerHTML = labHead(lab) + labWorkspace(simulator, controls, explanation);
-    $$('#experiment-grid').forEach(() => {});
-    if (lab.kind === 'water') updateWater();
-    if (lab.kind === 'molecule') updateMolecule();
-    if (lab.kind === 'density') updateDensity();
-    if (lab.kind === 'osmosis') updateOsmosis();
-    if (lab.kind === 'ph') updatePH();
-    if (lab.kind === 'pressure') updatePressure();
-    if (lab.kind === 'gases') updateGas();
-    if (lab.kind === 'greenhouse') updateGreenhouse();
-    renderExperiments();
-  }
-
-  function updateWater() {
-    const temp = Number($('#water-temp')?.value ?? 24);
-    const humidity = Number($('#water-humidity')?.value ?? 45);
-    const wind = Number($('#water-wind')?.value ?? 4);
-    $('#water-temp-out').textContent = `${temp} °C`;
-    $('#water-humidity-out').textContent = `${humidity}%`;
-    $('#water-wind-out').textContent = `${wind} وحدات`;
-    const level = Math.max(0, Math.round(temp * 1.5 + wind * 3 - humidity * .25));
-    const rate = level > 65 ? 'مرتفع نسبيًا' : level > 35 ? 'متوسط' : 'منخفض نسبيًا';
-    $('#lab-explain').innerHTML = `<strong>معدل التبخر في النموذج: ${rate}.</strong> الحرارة ${temp}°C ترفع ميل الماء للتبخر، والرطوبة ${humidity}% تقلل فرق بخار الماء، وحركة الهواء ${wind} تساعد على نقل البخار بعيدًا عن السطح.`;
-  }
-
-  function updateMolecule() {
-    const angle = Number($('#molecule-angle')?.value ?? 104.5);
-    $('#molecule-angle-out').textContent = `${angle.toFixed(1)}°`;
-    const extra = angle - 104.5;
-    const left = $('#hydrogen-left');
-    const right = $('#hydrogen-right');
-    if (left && right) {
-      left.style.transform = `translate(${-extra * .28}px, ${extra * .18}px)`;
-      right.style.transform = `translate(${extra * .28}px, ${extra * .18}px)`;
-    }
-    $('#lab-explain').innerHTML = `<strong>زاوية الجزيء: ${angle.toFixed(1)}°.</strong> الزاوية الطبيعية تقارب 104.5°. تغيير المؤشر هنا لأغراض التصور فقط؛ شكل جزيء الماء الحقيقي تحدده قوى الترابط والبنية الإلكترونية، وليس زرًا قابلًا للتغيير في الظروف العادية.`;
-  }
-
-  function updateOzone() {
-    $('#ozone-step').textContent = `${ozonePhase} / 2`;
-    $('#ozone-products')?.classList.toggle('show', ozonePhase >= 1);
-    $('#ozone-final')?.classList.toggle('show', ozonePhase >= 2);
-    $('#uv-rays')?.classList.toggle('active', ozonePhase >= 1);
-    $('#ozone-caption').textContent = ozonePhase === 0 ? 'ابدأ بتشغيل الأشعة فوق البنفسجية' : ozonePhase === 1 ? 'تفكك O₂: تكوّنت ذرتا أكسجين O' : 'اتحاد O مع O₂: تكوّن الأوزون O₃';
-    if (ozonePhase === 1) $('#lab-explain').innerHTML = '<strong>الخطوة الأولى:</strong> امتص جزيء الأكسجين فوتونًا من الأشعة فوق البنفسجية، فانفصل إلى ذرتي أكسجين: O₂ + hν → O + O.';
-    if (ozonePhase === 2) $('#lab-explain').innerHTML = '<strong>الخطوة الثانية:</strong> تتحد ذرة أكسجين مع جزيء O₂. وجود جزيء ثالث M يساعد على تبديد الطاقة الزائدة: O + O₂ + M → O₃ + M.';
-  }
-
-  function waterDensity(temp) {
-    if (temp < 0) return 917;
-    const t = temp;
-    return 1000 * (1 - ((t + 288.9414) / (508929.2 * (t + 68.12963))) * Math.pow(t - 3.9863, 2));
-  }
-
-  function updateDensity() {
-    const temp = Number($('#density-temp')?.value ?? 4);
-    $('#density-temp-out').textContent = `${temp} °C`;
-    const density = waterDensity(temp);
-    $('#density-readout').textContent = `ρ ≈ ${Math.round(density)} kg/m³`;
-    const ice = $('#density-ice');
-    const state = $('#density-state');
-    const liquid = $('#density-liquid');
-    if (temp < 0) {
-      ice.style.display = 'block';
-      ice.style.bottom = '25px';
-      state.textContent = 'جليد • كثافة أقل';
-      liquid.style.height = '45%';
-      $('#lab-explain').innerHTML = '<strong>الماء في حالة جليد.</strong> النموذج يعرض كثافة تقريبية للجليد 917 kg/m³، وهي أقل من كثافة الماء السائل قرب 4°C؛ لذلك يطفو الجليد.';
-    } else {
-      ice.style.display = 'none';
-      state.textContent = temp === 4 ? 'أعلى كثافة تقريبًا' : 'H₂O • سائل';
-      liquid.style.height = '64%';
-      const relation = temp === 4 ? 'قريب من أعلى كثافة للماء السائل.' : temp < 4 ? 'عند الاقتراب من التجمد تقل الكثافة عن قيمتها القصوى.' : 'مع الابتعاد عن 4°C نحو درجات أعلى تقل الكثافة تدريجيًا في هذا النطاق.';
-      $('#lab-explain').innerHTML = `<strong>${relation}</strong> قراءة النموذج ≈ ${density.toFixed(1)} kg/m³. عند 4°C تقريبًا تبلغ كثافة الماء السائل أقصاها.`;
-    }
-  }
-
-  function updateOsmosis() {
-    const a = Number($('#osmosis-a')?.value ?? 2);
-    const b = Number($('#osmosis-b')?.value ?? 7);
-    $('#osmosis-a-out').textContent = `${a} وحدات`;
-    $('#osmosis-b-out').textContent = `${b} وحدات`;
-    const arrow = $('#osmosis-arrow');
-    if (a < b) {
-      arrow.textContent = '⇢'; arrow.style.left = '43%';
-      $('#osmosis-label').textContent = 'الماء: A → B';
-      $('#lab-explain').innerHTML = `<strong>الاتجاه الصافي: من A إلى B.</strong> تركيز المذاب في A = ${a}، وفي B = ${b}. الماء يتحرك نحو الجانب الأعلى تركيزًا بالمذاب.`;
-    } else if (a > b) {
-      arrow.textContent = '⇠'; arrow.style.left = '50%';
-      $('#osmosis-label').textContent = 'الماء: B → A';
-      $('#lab-explain').innerHTML = `<strong>الاتجاه الصافي: من B إلى A.</strong> تركيز المذاب في A = ${a}، وفي B = ${b}. الماء يتحرك نحو الجانب الأعلى تركيزًا بالمذاب.`;
-    } else {
-      arrow.textContent = '↔'; arrow.style.left = '47%';
-      $('#osmosis-label').textContent = 'لا اتجاه صافٍ مفضل';
-      $('#lab-explain').innerHTML = `<strong>التركيزان متساويان.</strong> لا يوجد في هذا النموذج اتجاه صافٍ مفضل لحركة الماء.`;
-    }
-  }
-
-  function updatePH() {
-    const value = Number($('#ph-value')?.value ?? 7);
-    $('#ph-value-out').textContent = value;
-    $('#ph-current').textContent = value;
-    $('#ph-marker').style.left = `${(value / 14) * 100}%`;
-    const state = value < 7 ? 'حمضي' : value > 7 ? 'قاعدي' : 'متعادل تقريبًا';
-    $('#ph-state').textContent = state;
-    $('#lab-explain').innerHTML = `<strong>pH = ${value} (${state}).</strong> ${value < 7 ? 'تركيز H₃O⁺ أكبر نسبيًا من الماء المتعادل.' : value > 7 ? 'تركيز OH⁻ أكبر نسبيًا من الماء المتعادل.' : 'تركيزا H₃O⁺ وOH⁻ متساويان تقريبًا عند 25°C.'} تذكّر أن المقياس لوغاريتمي.`;
-  }
-
-  function updatePressure() {
-    const depth = Number($('#pressure-depth-input')?.value ?? 0);
-    $('#pressure-depth-input-out').textContent = `${depth} m`;
-    const totalAtm = 1 + depth / 10;
-    const kpa = 101.3 + 9.8 * depth;
-    $('#pressure-value').textContent = `${totalAtm.toFixed(1)} atm تقريبًا`;
-    $('#pressure-kpa').textContent = `${kpa.toFixed(1)} kPa`;
-    $('#pressure-diver').style.top = `${12 + depth * .72}%`;
-    $('#lab-explain').innerHTML = `<strong>على عمق ${depth} m: الضغط الكلي ≈ ${totalAtm.toFixed(1)} atm أو ${kpa.toFixed(1)} kPa.</strong> استخدمنا قاعدة تقريبية لماء البحر: يضاف نحو 1 atm لكل 10 m. القيم تقريبية للتعلم فقط.`;
-  }
-
-  function oxygenSaturation(temp) {
-    const points = [[0,14.6],[5,12.8],[10,11.3],[15,10.1],[20,9.1],[25,8.3],[30,7.6],[35,7.0]];
-    for (let i = 0; i < points.length - 1; i++) {
-      const [t1,v1] = points[i], [t2,v2] = points[i+1];
-      if (temp >= t1 && temp <= t2) return v1 + (v2-v1) * ((temp-t1)/(t2-t1));
-    }
-    return points[points.length-1][1];
-  }
-
-  function updateGas() {
-    const temp = Number($('#gas-temp')?.value ?? 20);
-    const value = oxygenSaturation(temp);
-    $('#gas-temp-out').textContent = `${temp} °C`;
-    $('#gas-value').textContent = `${value.toFixed(1)} mg/L`;
-    $('#gas-liquid').style.height = `${40 + value * 3}%`;
-    $('#lab-explain').innerHTML = `<strong>ذوبانية مشبعة تقريبية: ${value.toFixed(1)} mg/L.</strong> في الماء العذب عند ضغط قريب من سطح البحر، تقل كمية الأكسجين التي يستطيع الماء الاحتفاظ بها كلما ارتفعت الحرارة. هذه قيم تقريبية وليست قراءة ميدانية.`;
-  }
-
-  function updateGreenhouse() {
-    const level = Number($('#greenhouse-level')?.value ?? 50);
-    $('#greenhouse-level-out').textContent = `${level}%`;
-    const layer = $('#greenhouse-layer');
-    if (layer) layer.style.borderColor = `rgba(102,213,202,${.15 + level / 125})`;
-    const ray = $('#greenhouse-ray');
-    if (ray) ray.style.opacity = `${Math.max(.18, 1 - level / 130)}`;
-    $('#lab-explain').innerHTML = `<strong>مستوى الغازات في النموذج: ${level}%.</strong> عند زيادة غازات الدفيئة في النموذج يزداد امتصاص وإعادة إصدار جزء من الأشعة تحت الحمراء. هذا شرح للفكرة وليس مقياسًا حقيقيًا لدرجة حرارة الأرض.`;
-  }
-
-  function renderExperiments() {
-    $('#experiment-grid').innerHTML = experiments.map(exp => `<article class="experiment-card"><div class="exp-icon">${exp.icon}</div><h4>${escapeHTML(exp.title)}</h4><p>${escapeHTML(exp.time)} • الدرس ${exp.lesson}</p><button data-experiment="${exp.id}">اعرض خطوات التجربة ←</button></article>`).join('');
-  }
-
-  function showExperiment(id) {
-    const exp = experiments.find(item => item.id === id);
-    if (!exp) return;
-    const old = $('#experiment-detail');
-    if (old) old.remove();
-    const detail = document.createElement('article');
-    detail.className = 'experiment-detail';
-    detail.id = 'experiment-detail';
-    detail.innerHTML = `<h4>${exp.icon} ${escapeHTML(exp.title)}</h4><p class="materials"><strong>الأدوات:</strong> ${escapeHTML(exp.materials)} <span> • ${escapeHTML(exp.time)}</span></p><ol>${exp.steps.map(step => `<li>${escapeHTML(step)}</li>`).join('')}</ol><p class="materials"><strong>التفسير العلمي:</strong> ${escapeHTML(exp.why)}</p><p class="caution">تنبيه: ${escapeHTML(exp.caution)}</p><button class="outline-btn" data-close-experiment>إغلاق التفاصيل ×</button>`;
-    $('#experiment-grid').after(detail);
-    detail.scrollIntoView({behavior:'smooth',block:'nearest'});
-  }
-
-  // Main delegated events keep dynamically rendered controls working.
-  document.addEventListener('click', event => {
-    const target = event.target.closest('button');
-    if (!target) return;
-
-    if (target.dataset.view) { setView(target.dataset.view); return; }
-    if (target.dataset.lesson) {
-      activeLesson = Number(target.dataset.lesson);
-      setView('learn'); renderLesson(); return;
-    }
-    if (target.dataset.mapLesson) {
-      activeLesson = Number(target.dataset.mapLesson);
-      setView('learn'); renderLesson(); return;
-    }
-    if (target.dataset.jump) { setView(target.dataset.jump); return; }
-    if (target.id === 'open-map') { setView('map'); return; }
-    if (target.dataset.lab) { renderLab(target.dataset.lab); return; }
-    if (target.dataset.term) { openTerm(target.dataset.term); return; }
-    if (target.dataset.glossaryIndex !== undefined) {
-      const entry = glossary[Number(target.dataset.glossaryIndex)];
-      if (entry) openTerm(entry[0]);
-      return;
-    }
-    if (target.id === 'dialog-close') { $('#term-dialog').close(); return; }
-    if (target.id === 'complete-lesson') {
-      if (completed.has(activeLesson)) { completed.delete(activeLesson); showToast('تم إلغاء اكتمال الدرس.'); }
-      else { completed.add(activeLesson); showToast('تم حفظ الدرس كمكتمل ✓'); }
-      persist(); renderLesson(); return;
-    }
-    if (target.hasAttribute('data-lesson-prev')) { if (activeLesson > 1) activeLesson--; renderLesson(); return; }
-    if (target.hasAttribute('data-lesson-next')) { if (activeLesson < lessons.length) activeLesson++; renderLesson(); return; }
-    if (target.hasAttribute('data-open-quiz')) {
-      $('#quiz-lesson-select').value = String(activeLesson);
-      setView('quiz'); renderQuiz(); return;
-    }
-    if (target.dataset.answer !== undefined) {
-      const card = target.closest('.question-card');
-      const key = card?.dataset.question;
-      if (!key || answered.has(key)) return;
-      const question = allQuestions().find(item => item.key === key);
-      if (!question) return;
-      answered.set(key, Number(target.dataset.answer));
-      renderQuiz();
-      return;
-    }
-    if (target.dataset.experiment) { showExperiment(target.dataset.experiment); return; }
-    if (target.hasAttribute('data-close-experiment')) { $('#experiment-detail')?.remove(); return; }
-    if (target.dataset.labAction === 'uv') { ozonePhase = Math.max(ozonePhase,1); updateOzone(); return; }
-    if (target.dataset.labAction === 'form-ozone') {
-      if (ozonePhase < 1) { showToast('شغّل الأشعة فوق البنفسجية أولًا.'); return; }
-      ozonePhase = 2; updateOzone(); return;
-    }
-    if (target.dataset.labAction === 'reset-ozone') { ozonePhase = 0; updateOzone(); return; }
-    if (target.dataset.layer) {
-      const layerInfo = {
-        Troposphere:'التروبوسفير: الطبقة السفلى، وتحدث فيها معظم ظواهر الطقس والسحب.',
-        Stratosphere:'الستراتوسفير: تحتوي على طبقة الأوزون التي تمتص قدرًا كبيرًا من الأشعة فوق البنفسجية.',
-        Mesosphere:'الميزوسفير: تحترق فيها غالبية الشهب الصغيرة أثناء دخولها الغلاف الجوي.',
-        Thermosphere:'الثرموسفير: طبقة علوية ترتبط بها ظواهر الشفق القطبي.',
-        Exosphere:'الإكسوسفير: الطبقة الخارجية ذات الغازات المتباعدة جدًا.'
-      };
-      $('#lab-explain').innerHTML = `<strong>${target.dataset.layer}.</strong> ${layerInfo[target.dataset.layer] || ''}`;
-      return;
-    }
-    if (target.id === 'continue-learning') {
-      const next = lessons.find(lesson => !completed.has(lesson.id));
-      activeLesson = next?.id || 1;
-      setView('learn'); renderLesson(); return;
-    }
-    if (target.id === 'reset-progress') {
-      if (confirm('هل تريد مسح الدروس المكتملة من هذا الجهاز؟')) {
-        completed.clear(); persist(); renderLesson(); showToast('تمت إعادة ضبط التقدم.');
-      }
-      return;
-    }
-    if (target.id === 'mobile-menu') { $('#sidebar').classList.toggle('open'); return; }
-    if (target.id === 'theme-toggle') {
-      document.body.classList.toggle('light');
-      try { localStorage.setItem('science-lab-theme', document.body.classList.contains('light') ? 'light' : 'dark'); } catch {}
-      target.textContent = document.body.classList.contains('light') ? '☾' : '☼';
-      return;
-    }
-    if (target.id === 'shuffle-quiz') {
-      quizOrder = allQuestions().map(question => question.key).sort(() => Math.random() - .5);
-      renderQuiz(); showToast('تم خلط الأسئلة.'); return;
-    }
+  document.addEventListener('click',event=>{
+    const viewBtn=event.target.closest('[data-view]');if(viewBtn){switchView(viewBtn.dataset.view);return;}
+    const lessonBtn=event.target.closest('[data-lesson]');if(lessonBtn){const id=Number(lessonBtn.dataset.lesson);switchView('lessons');renderLessonBrowser();renderLesson(id);return;}
+    const labBtn=event.target.closest('[data-open-lab]');if(labBtn){switchView('lab');renderLab(labBtn.dataset.openLab);return;}
+    const term=event.target.closest('[data-term]');if(term){openTerm(term.dataset.term);return;}
+    const complete=event.target.closest('[data-complete]');if(complete){setComplete(complete.dataset.complete);return;}
+    const quiz=event.target.closest('[data-open-lesson-quiz]');if(quiz){switchView('quiz');$('#quiz-unit').value=String(lessonById(quiz.dataset.openLessonQuiz)?.unit||'all');renderQuizSetup();$('#quiz-lesson').value=quiz.dataset.openLessonQuiz;$('#quiz-count-select').value='15';beginQuiz();return;}
+    const openLab=event.target.closest('[data-open-lab-for-lesson]');if(openLab){const lab=getLessonLab(openLab.dataset.openLabForLesson);if(lab){switchView('lab');renderLab(lab.id);}return;}
+    const visual=event.target.closest('[data-open-visual]');if(visual){const id=visual.dataset.openVisual;const lab=labs.find(l=>l.lesson===state.lessonId&&((id==='water-distribution'&&l.kind==='distribution')||(id==='water-cycle'&&l.kind==='water-cycle')||(id==='molecule'&&l.kind==='molecule')||(id==='osmosis'&&l.kind==='osmosis')||(id==='atmosphere-layers'&&l.kind==='layers')||(id==='ozone-cycle'&&l.kind==='ozone')||(id==='greenhouse'&&l.kind==='greenhouse')))||getLessonLab(state.lessonId);if(lab){switchView('lab');renderLab(lab.id);}else{switchView('lab');renderLab(state.labId);}return;}
+    const unit=event.target.closest('[data-unit]');if(unit){switchView('lessons');renderLessonBrowser();const first=lessons.find(l=>String(l.unit)===unit.dataset.unit);if(first)renderLesson(first.id);return;}
+    const switchLesson=event.target.closest('[data-switch-lesson]');if(switchLesson){const id=Number(switchLesson.dataset.lesson);switchView('lessons');renderLessonBrowser();renderLesson(id);return;}
   });
+  $('#mobile-menu')?.addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
+  $('#start-learning')?.addEventListener('click',()=>{switchView('lessons');renderLessonBrowser();renderLesson(1);});
+  $('#global-search')?.addEventListener('keydown',e=>{if(e.key==='Enter')performSearch(e.target.value);});
+  $('#global-search')?.addEventListener('input',e=>{if(e.target.value.length>2){/* search on Enter to avoid replacing the reading view while typing */}});
+  $('#glossary-search')?.addEventListener('input',e=>renderGlossary(e.target.value));
+  $('#quiz-unit')?.addEventListener('change',renderQuizSetup);
+  $('#begin-quiz')?.addEventListener('click',beginQuiz);
+  $('#close-term')?.addEventListener('click',()=>$('#term-modal').close());
+  $('#term-modal')?.addEventListener('click',e=>{if(e.target===$('#term-modal'))$('#term-modal').close();});
+  $('#theme-toggle')?.addEventListener('click',()=>{state.theme=state.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=state.theme;store.write('aqua-theme',state.theme);});
+  $('#reset-progress')?.addEventListener('click',()=>{if(confirm('هل تريد مسح تقدم الدروس المحفوظ على هذا الجهاز؟')){state.completed.clear();store.write('aqua-completed',[]);updateProgress();renderHome();toast('تمت إعادة ضبط التقدم.');}});
+  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('#global-search')?.focus();}if(e.key==='Escape')$('#sidebar').classList.remove('open');});
 
-  document.addEventListener('input', event => {
-    const id = event.target.id;
-    if (id === 'glossary-search') { renderGlossary(event.target.value); return; }
-    if (id === 'global-search') return;
-    if (id === 'quiz-lesson-select') return;
-    if (id.startsWith('water-')) { updateWater(); return; }
-    if (id === 'molecule-angle') { updateMolecule(); return; }
-    if (id === 'density-temp') { updateDensity(); return; }
-    if (id.startsWith('osmosis-')) { updateOsmosis(); return; }
-    if (id === 'ph-value') { updatePH(); return; }
-    if (id === 'pressure-depth-input') { updatePressure(); return; }
-    if (id === 'gas-temp') { updateGas(); return; }
-    if (id === 'greenhouse-level') { updateGreenhouse(); return; }
-  });
-
-  $('#quiz-lesson-select').addEventListener('change', () => renderQuiz());
-  $('#glossary-search').addEventListener('input', event => renderGlossary(event.target.value));
-  $('#global-search').addEventListener('keydown', event => {
-    if (event.key !== 'Enter') return;
-    const query = event.target.value.trim().toLowerCase();
-    if (!query) return;
-    const lesson = lessons.find(item => `${item.title} ${item.en} ${item.intro} ${item.keywords.join(' ')}`.toLowerCase().includes(query));
-    const term = glossary.find(item => item.join(' ').toLowerCase().includes(query));
-    if (lesson) {
-      activeLesson = lesson.id; setView('learn'); renderLesson();
-    } else if (term) {
-      setView('glossary'); renderGlossary(query); openTerm(term[0]);
-    } else {
-      showToast('ملقتش نتيجة مطابقة. جرّب كلمة أقصر.');
-    }
-  });
-
-  document.addEventListener('keydown', event => {
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault(); $('#global-search').focus();
-    }
-    if (event.key === 'Escape') $('#sidebar').classList.remove('open');
-  });
-
-  // Initialize the dashboard.
-  try {
-    if (localStorage.getItem('science-lab-theme') === 'light') {
-      document.body.classList.add('light');
-      $('#theme-toggle').textContent = '☾';
-    }
-  } catch {}
-  $('#stat-labs').innerHTML = `${labs.length} <span>محاكاة</span>`;
-  $('#stat-questions').innerHTML = `${lessons.reduce((total, lesson) => total + lesson.quiz.length, 0)} <span>سؤالًا</span>`;
-  renderLessonNav();
-  renderLesson();
-  updateProgress();
-  renderMap();
-  renderGlossary();
-  renderQuiz();
-  renderLab(activeLab);
+  document.documentElement.dataset.theme=state.theme;
+  renderHome();renderSidebar();renderLessonBrowser();renderLabLibrary();renderQuizSetup();renderMap();
 })();
